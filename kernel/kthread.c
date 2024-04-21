@@ -668,20 +668,34 @@ int kthreadd(void *unused)
 	cgroup_init_kthreadd();
 
 	for (;;) {
+
+		// 首先将线程状态设置为 TASK_INTERRUPTIBLE, 如果当前
+        // 没有要创建的线程则主动放弃 CPU 完成调度.此进程变为阻塞态
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (list_empty(&kthread_create_list))
 			schedule(); // 让出CPU
+		
+		// kthreadd线程被唤醒，将进程状态标为running
 		__set_current_state(TASK_RUNNING);
 
+		// 循环创建线程
 		spin_lock(&kthread_create_lock);
 		while (!list_empty(&kthread_create_list)) {
 			struct kthread_create_info *create;
 
+			/*
+			 * 从链表中取得 kthread_create_info 结构的地址，在上文中已经完成插入操作(将
+             * kthread_create_info 结构中的 list 成员加到链表中，此时根据成员 list 的偏移
+             * 获得 create)
+			 */
 			create = list_entry(kthread_create_list.next,
 					    struct kthread_create_info, list);
+			
+			// 取出线程创建任务从链表中删除
 			list_del_init(&create->list);
 			spin_unlock(&kthread_create_lock);
 
+			// 真正创建线程
 			create_kthread(create);
 
 			spin_lock(&kthread_create_lock);

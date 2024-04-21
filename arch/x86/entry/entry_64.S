@@ -229,6 +229,7 @@ SYM_CODE_END(entry_SYSCALL_64)
 .pushsection .text, "ax"
 SYM_FUNC_START(__switch_to_asm)
 	/*
+	 * callee = 被调用者，即next
 	 * Save callee-saved registers
 	 * This must match the order in inactive_task_frame
 	 */
@@ -265,6 +266,7 @@ SYM_FUNC_START(__switch_to_asm)
 	popq	%rbx
 	popq	%rbp
 
+	/* process_64.c */
 	jmp	__switch_to
 SYM_FUNC_END(__switch_to_asm)
 .popsection

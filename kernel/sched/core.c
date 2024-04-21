@@ -959,6 +959,7 @@ void wake_up_q(struct wake_q_head *head)
  * might also involve a cross-CPU call to trigger the scheduler on
  * the target CPU.
  */
+// 参考https://zhuanlan.zhihu.com/p/353517059
 void resched_curr(struct rq *rq)
 {
 	struct task_struct *curr = rq->curr;
@@ -966,19 +967,19 @@ void resched_curr(struct rq *rq)
 
 	lockdep_assert_rq_held(rq);
 
-	if (test_tsk_need_resched(curr))
+	if (test_tsk_need_resched(curr)) // 无需重复设置need_resched标志位
 		return;
 
 	cpu = cpu_of(rq);
 
-	if (cpu == smp_processor_id()) {
-		set_tsk_need_resched(curr);
-		set_preempt_need_resched();
+	if (cpu == smp_processor_id()) { 	// 当前cpu
+		set_tsk_need_resched(curr);		// 设置thread info	
+		set_preempt_need_resched();		// 设置preempt count
 		return;
 	}
 
-	if (set_nr_and_not_polling(curr))
-		smp_send_reschedule(cpu);
+	if (set_nr_and_not_polling(curr)) // 执行了set_tsk_need_resched(curr)
+		smp_send_reschedule(cpu);	// IPI通知目标CPU，目标CPU读取thread info标志位并拷贝至preempt count
 	else
 		trace_sched_wake_idle_without_ipi(cpu);
 }
@@ -4972,6 +4973,7 @@ static __always_inline struct rq *
 context_switch(struct rq *rq, struct task_struct *prev,
 	       struct task_struct *next, struct rq_flags *rf)
 {
+	// 切换的准备工作，包括更新统计信息、设置 next->on_cpu 为 1 等
 	prepare_task_switch(rq, prev, next);
 
 	/*
@@ -4989,14 +4991,17 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 *   user ->   user   switch
 	 */
 	if (!next->mm) {                                // to kernel
-		enter_lazy_tlb(prev->active_mm, next);
+		enter_lazy_tlb(prev->active_mm, next);		// 不刷新TLB
 
-		next->active_mm = prev->active_mm;
+		next->active_mm = prev->active_mm; // 内核线程的mm设置为prev_task的mm
 		if (prev->mm)                           // from user
-			mmgrab(prev->active_mm);
+			mmgrab(prev->active_mm); //增加mm引用
 		else
 			prev->active_mm = NULL;
 	} else {                                        // to user
+
+		// 如果被调度的下一个进程是用户态进程，则需要调用 membarrier_switch_mm 函数，
+		// 将next->mm的membarrier字段赋给runqueue
 		membarrier_switch_mm(rq, prev->active_mm, next->mm);
 		/*
 		 * sys_membarrier() requires an smp_mb() between setting
@@ -5020,10 +5025,14 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	prepare_lock_switch(rq, next, rf);
 
 	/* Here we just switch the register state and the stack. */
-	switch_to(prev, next, prev);
+	// switch_to函数后进程成功切换，后面的代码均由新进程执行
+	// 第三个参数表示上一个进程，让next进程知道是从哪个进程切换而来
+	switch_to(prev, next, prev); // A process
 	barrier();
 
-	return finish_task_switch(prev);
+	// B进程之所以可以执行这条函数，是因为B进程在被切走时，也是停留在这里
+	// 所以当切回来时，仍然从这里开始执行，准确来说是从上面的switch_to返回
+	return finish_task_switch(prev); // B process
 }
 
 /*
@@ -5639,7 +5648,8 @@ __pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	 */
 	if (likely(prev->sched_class <= &fair_sched_class &&
 		   rq->nr_running == rq->cfs.h_nr_running)) {
-
+		
+		// CFS公平调度
 		p = pick_next_task_fair(rq, prev, rf);
 		if (unlikely(p == RETRY_TASK))
 			goto restart;
@@ -6292,6 +6302,8 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 	// clock表示当前runqueue从CPU读取的最后一个时钟clock
 	update_rq_clock(rq);
 
+	// 自愿调度，选中nvcsw
+	// 非自愿调度，选中nivcsw
 	switch_count = &prev->nivcsw;
 
 	/*
@@ -6307,11 +6319,14 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 		if (signal_pending_state(prev_state, prev)) { // 判断是否有未处理信号
 			WRITE_ONCE(prev->__state, TASK_RUNNING);
 		} else {
+			// 判断当前任务是否对load有贡献
 			prev->sched_contributes_to_load =
 				(prev_state & TASK_UNINTERRUPTIBLE) &&
 				!(prev_state & TASK_NOLOAD) &&
 				!(prev->flags & PF_FROZEN);
 
+			// 若有贡献，则runqueue不可中断任务计数++
+			// 该计数在ttwu函数中会被--，计数总量与CPU核个数保持相当
 			if (prev->sched_contributes_to_load)
 				rq->nr_uninterruptible++;
 
@@ -6326,19 +6341,21 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 			 *
 			 * After this, schedule() must not care about p->state any more.
 			 */
-			deactivate_task(rq, prev, DEQUEUE_SLEEP | DEQUEUE_NOCLOCK);
+			deactivate_task(rq, prev, DEQUEUE_SLEEP | DEQUEUE_NOCLOCK); // 将task从runqueue中移除
 
-			if (prev->in_iowait) {
+			if (prev->in_iowait) { // 当前进程处于io等待状态
 				atomic_inc(&rq->nr_iowait);
-				delayacct_blkio_start();
+				delayacct_blkio_start(); // 计时，块设备io延迟时间
 			}
 		}
-		switch_count = &prev->nvcsw;
+		// 自愿调度，选中nvcsw
+		// 非自愿调度，选中nivcsw
+		switch_count = &prev->nvcsw; 
 	}
 
 	next = pick_next_task(rq, prev, &rf);
-	clear_tsk_need_resched(prev);
-	clear_preempt_need_resched();
+	clear_tsk_need_resched(prev); // 清除prev任务的 "TIF_NEED_RESCHED" 标记
+	clear_preempt_need_resched(); // 清除抢占任务的 "PREEMPT_NEED_RESCHED" 标记，改变preemmpt count
 #ifdef CONFIG_SCHED_DEBUG
 	rq->last_seen_need_resched_ns = 0;
 #endif
@@ -6460,7 +6477,8 @@ asmlinkage __visible void __sched schedule(void)
 		preempt_disable(); // 当前进程执行
 		__schedule(SM_NONE); // 在函数中实现了进程的切换 A->B
 		sched_preempt_enable_no_resched(); // B进程执行抢占的使能
-	} while (need_resched());
+	} while (need_resched()); // 检查当前进程B是否需要重新调度(NEED_RESCHED被置位) 
+	// 当某个进程耗尽分配的时间片时，scheduler_tick()就会设置这个标志
 	sched_update_worker(tsk);
 }
 EXPORT_SYMBOL(schedule);
