@@ -175,6 +175,7 @@ typedef struct {
 } atomic64_t;
 #endif
 
+// 双向链表节点
 struct list_head {
 	struct list_head *next, *prev;
 };

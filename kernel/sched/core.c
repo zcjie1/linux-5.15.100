@@ -6472,13 +6472,19 @@ asmlinkage __visible void __sched schedule(void)
 {
 	struct task_struct *tsk = current;
 
-	sched_submit_work(tsk); // 预防死锁
+	/*仅当tsk处在非运行状态时，才需要进行死锁预防操作*/
+    if(!task_is_running(tsk))
+		sched_submit_work(tsk); // 预防死锁
 	do {
+		// 不需要将死锁预防移入循环，是因为每次调度的进程必然是Running状态的
 		preempt_disable(); // 当前进程执行
 		__schedule(SM_NONE); // 在函数中实现了进程的切换 A->B
 		sched_preempt_enable_no_resched(); // B进程执行抢占的使能
-	} while (need_resched()); // 检查当前进程B是否需要重新调度(NEED_RESCHED被置位) 
-	// 当某个进程耗尽分配的时间片时，scheduler_tick()就会设置这个标志
+
+		/*检查当前进程B是否需要重新调度(NEED_RESCHED被置位)
+		 *当某个进程耗尽分配的时间片时，scheduler_tick()就会设置这个标志
+		 */
+	} while (need_resched());
 	sched_update_worker(tsk);
 }
 EXPORT_SYMBOL(schedule);

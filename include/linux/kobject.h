@@ -62,13 +62,13 @@ enum kobject_action {
 };
 
 struct kobject {
-	const char		*name;
+	const char		*name; // 对象的文本名称，可通过sd导出至用户空间
 	struct list_head	entry;
 	struct kobject		*parent;
-	struct kset		*kset;
-	struct kobj_type	*ktype;
+	struct kset		*kset; // 标明所属的kobject集合
+	struct kobj_type	*ktype; // 更多有关kobject的信息，如释放结构体的析构函数
 	struct kernfs_node	*sd; /* sysfs directory entry */
-	struct kref		kref;
+	struct kref		kref; // 引用计数
 #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
 	struct delayed_work	release;
 #endif
