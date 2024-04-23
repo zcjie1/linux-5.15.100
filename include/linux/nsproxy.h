@@ -27,9 +27,11 @@ struct fs_struct;
  * The nsproxy is shared by tasks which share all namespaces.
  * As soon as a single namespace is cloned or unshared, the
  * nsproxy is copied.
+ * 
+ * 每个基础命名空间都需要标明所属的user命名空间
+ * user命名空间用于管理用户权限(uid, gid, capability等)
+ * 
  */
-// 每个基础命名空间都需要标明所属的user命名空间
-// user命名空间用于管理用户权限(uid, gid, capability等)
 struct nsproxy {
 	atomic_t count;
 	struct uts_namespace *uts_ns;

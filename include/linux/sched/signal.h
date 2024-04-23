@@ -199,6 +199,23 @@ struct signal_struct {
 	 * getrlimit/setrlimit use task_lock(current->group_leader) to
 	 * protect this instead of the siglock, because they really
 	 * have no need to disable irqs.
+	 * 
+	 * 	Max cpu time              
+	 *	Max file size            
+	 *	Max data size            
+	 *	Max stack size            
+	 *	Max core file size        
+	 *	Max resident set          
+	 *	Max processes             
+	 *	Max open files            
+	 *	Max locked memory         
+	 *	Max address space         
+	 *	Max file locks            
+	 *	Max pending signals       
+	 *	Max msgqueue size         
+	 *	Max nice priority         
+	 *	Max realtime priority     
+	 /	Max realtime timeout      
 	 */
 	struct rlimit rlim[RLIM_NLIMITS];
 

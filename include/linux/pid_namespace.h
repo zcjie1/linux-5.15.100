@@ -17,13 +17,13 @@
 struct fs_pin;
 
 struct pid_namespace {
-	struct idr idr;
+	struct idr idr; // 实现ID与数据结构的绑定，使用radix树实现
 	struct rcu_head rcu;
 	unsigned int pid_allocated;
-	struct task_struct *child_reaper;
-	struct kmem_cache *pid_cachep;
-	unsigned int level;
-	struct pid_namespace *parent;
+	struct task_struct *child_reaper; // 孤儿收割机，pid空间内的init进程
+	struct kmem_cache *pid_cachep; // pid_cache_pool
+	unsigned int level;	// 当前pid命名空间的层级深度，初始空间为0
+	struct pid_namespace *parent; // 父pid空间
 #ifdef CONFIG_BSD_PROCESS_ACCT
 	struct fs_pin *bacct;
 #endif

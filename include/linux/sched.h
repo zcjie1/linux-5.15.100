@@ -80,29 +80,29 @@ struct task_group;
  */
 
 /* Used in tsk->state: */
-#define TASK_RUNNING			0x0000
-#define TASK_INTERRUPTIBLE		0x0001
-#define TASK_UNINTERRUPTIBLE		0x0002
-#define __TASK_STOPPED			0x0004
-#define __TASK_TRACED			0x0008
+#define TASK_RUNNING			0x0000 // 可执行+正在执行
+#define TASK_INTERRUPTIBLE		0x0001 // 可中断的睡眠状态(等待事件发生)
+#define TASK_UNINTERRUPTIBLE	0x0002 // 不接受异步信号(如kill)，但响应外部中断
+#define __TASK_STOPPED			0x0004 // 接收SIGSTOP信号暂停，可由SIGCONT信号唤醒
+#define __TASK_TRACED			0x0008 // 断点调试暂停，不可由SIGCONT信号唤醒(特殊的TASK_STOPPED)
 /* Used in tsk->exit_state: */
-#define EXIT_DEAD			0x0010
-#define EXIT_ZOMBIE			0x0020
+#define EXIT_DEAD			0x0010 // wait调用已发出，进程完全移除之前的状态(用于多进程对于一个进程同时wait)
+#define EXIT_ZOMBIE			0x0020 // 僵尸进程
 #define EXIT_TRACE			(EXIT_ZOMBIE | EXIT_DEAD)
 /* Used in tsk->state again: */
-#define TASK_PARKED			0x0040
-#define TASK_DEAD			0x0080
-#define TASK_WAKEKILL			0x0100
-#define TASK_WAKING			0x0200
-#define TASK_NOLOAD			0x0400
-#define TASK_NEW			0x0800
+#define TASK_PARKED			0x0040 // 用于cpu hotplug
+#define TASK_DEAD			0x0080 // 进程退出，资源回收，等待父进程收尸
+#define TASK_WAKEKILL		0x0100 // 收到kill信号被唤醒
+#define TASK_WAKING			0x0200 // 唤醒函数中的状态(wake_up_process->try_to_wake_up)
+#define TASK_NOLOAD			0x0400 // workqueue进程状态
+#define TASK_NEW			0x0800 // fork, clone, kernel_thread创建线程初始
 /* RT specific auxilliary flag to mark RT lock waiters */
 #define TASK_RTLOCK_WAIT		0x1000
 #define TASK_STATE_MAX			0x2000
 
 /* Convenience macros for the sake of set_current_state: */
-#define TASK_KILLABLE			(TASK_WAKEKILL | TASK_UNINTERRUPTIBLE)
-#define TASK_STOPPED			(TASK_WAKEKILL | __TASK_STOPPED)
+#define TASK_KILLABLE		(TASK_WAKEKILL | TASK_UNINTERRUPTIBLE)
+#define TASK_STOPPED		(TASK_WAKEKILL | __TASK_STOPPED)
 #define TASK_TRACED			(TASK_WAKEKILL | __TASK_TRACED)
 
 #define TASK_IDLE			(TASK_UNINTERRUPTIBLE | TASK_NOLOAD)
@@ -725,6 +725,8 @@ struct task_struct {
 	/*
 	 * For reasons of header soup (see current_thread_info()), this
 	 * must be the first element of task_struct.
+	 * 
+	 * current_thread_info()将task_struct指针强制转换为thread_info指针
 	 */
 	struct thread_info		thread_info;
 #endif
@@ -853,8 +855,11 @@ struct task_struct {
 	struct plist_node		pushable_tasks;
 	struct rb_node			pushable_dl_tasks;
 #endif
-
-	struct mm_struct		*mm;
+	/**
+	 * 对于内核线程，mm为NULL，active_mm为上一个线程的active_mm
+	 * 对于用户线程，mm = active_mm
+	*/
+	struct mm_struct		*mm;	
 	struct mm_struct		*active_mm;
 
 	/* Per-thread vma caching: */
@@ -941,7 +946,7 @@ struct task_struct {
 	struct restart_block		restart_block;
 
 	pid_t				pid;
-	pid_t				tgid;
+	pid_t				tgid; // 属于同一个进程的多个线程拥有同样的tgid
 
 #ifdef CONFIG_STACKPROTECTOR
 	/* Canary value for the -fstack-protector GCC feature: */
@@ -953,8 +958,8 @@ struct task_struct {
 	 * p->real_parent->pid)
 	 */
 
-	/* Real parent process: */
-	struct task_struct __rcu	*real_parent;
+	/* Real parent process: 用于调试*/
+	struct task_struct __rcu	*real_parent; 
 
 	/* Recipient of SIGCHLD, wait4() reports: */
 	struct task_struct __rcu	*parent;
@@ -962,9 +967,9 @@ struct task_struct {
 	/*
 	 * Children/sibling form the list of natural children:
 	 */
-	struct list_head		children;
-	struct list_head		sibling;
-	struct task_struct		*group_leader;
+	struct list_head		children; // 子进程链表
+	struct list_head		sibling; // 父进程的子进程链表(自身所在链表)
+	struct task_struct		*group_leader; // 多线程进程中的主线程
 
 	/*
 	 * 'ptraced' is the list of tasks this task is using ptrace() on.
@@ -976,7 +981,13 @@ struct task_struct {
 	struct list_head		ptrace_entry;
 
 	/* PID/PID hash table linkage. */
-	struct pid			*thread_pid;
+	/**
+	 * 指向当前线程所属的pid结构体(每个线程都有独属于自己的pid)
+	 * pid结构体中包含当前线程所属的各类ID(PID, TGID, PGID, SID)的哈希链表头
+	 * pid_links则是上述哈希链表中的节点，帮助pid结构体找到自己管理的task struct
+	*/
+	struct pid				*thread_pid;
+
 	struct hlist_node		pid_links[PIDTYPE_MAX];
 	struct list_head		thread_group;
 	struct list_head		thread_node;
@@ -1008,8 +1019,8 @@ struct task_struct {
 	atomic_t			tick_dep_mask;
 #endif
 	/* Context switch counts: */
-	unsigned long			nvcsw;
-	unsigned long			nivcsw;
+	unsigned long			nvcsw; // 自愿上下文切换次数
+	unsigned long			nivcsw; // 非自愿上下文切换次数
 
 	/* Monotonic time in nsecs: */
 	u64				start_time;
@@ -1051,6 +1062,7 @@ struct task_struct {
 	 * - normally initialized setup_new_exec()
 	 * - access it with [gs]et_task_comm()
 	 * - lock it with task_lock()
+	 * - 可执行文件名
 	 */
 	char				comm[TASK_COMM_LEN];
 
@@ -1074,11 +1086,11 @@ struct task_struct {
 	struct io_uring_task		*io_uring;
 #endif
 
-	/* Namespaces: */
+	/* Namespaces: 命名空间*/
 	struct nsproxy			*nsproxy;
 
-	/* Signal handlers: */
-	struct signal_struct		*signal;
+	/* Signal handlers: 信号处理*/
+	struct signal_struct		*signal; // 包含rlimit数组, PGID-进程(非线程)组ID，SID-会话组(多个进程组)ID
 	struct sighand_struct __rcu		*sighand;
 	sigset_t			blocked;
 	sigset_t			real_blocked;
@@ -1101,7 +1113,7 @@ struct task_struct {
 	struct seccomp			seccomp;
 	struct syscall_user_dispatch	syscall_dispatch;
 
-	/* Thread group tracking: */
+	/* Thread group tracking: 线程组跟踪*/
 	u64				parent_exec_id;
 	u64				self_exec_id;
 
@@ -1155,7 +1167,7 @@ struct task_struct {
 	unsigned int			in_ubsan;
 #endif
 
-	/* Journalling filesystem info: */
+	/* Journalling filesystem info: 日志文件系统 */
 	void				*journal_info;
 
 	/* Stacked block device info: */
@@ -1166,7 +1178,7 @@ struct task_struct {
 	struct blk_plug			*plug;
 #endif
 
-	/* VM state: */
+	/* VM state: 虚拟内存状态*/
 	struct reclaim_state		*reclaim_state;
 
 	struct backing_dev_info		*backing_dev_info;

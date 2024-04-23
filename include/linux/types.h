@@ -180,10 +180,16 @@ struct list_head {
 	struct list_head *next, *prev;
 };
 
+/**
+ * 哈希链表头节点，用作哈希桶
+ * 仅含有一个first字段，指向第一个hlist_node
+ * 不使用list_head的双节点是因为哈希表有很多表项，两个字段浪费空间
+*/
 struct hlist_head {
 	struct hlist_node *first;
 };
 
+// pprev字段指向前一个节点的next指针
 struct hlist_node {
 	struct hlist_node *next, **pprev;
 };

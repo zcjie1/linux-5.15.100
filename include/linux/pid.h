@@ -49,11 +49,12 @@ enum pid_type
  * struct upid is used to get the id of the struct pid, as it is
  * seen in particular namespace. Later the struct pid is found with
  * find_pid_ns() using the int nr and struct pid_namespace *ns.
+ * 
+ * 存储特定pid命名空间，以及该空间内可见的pid
  */
-
 struct upid {
-	int nr;
-	struct pid_namespace *ns;
+	int nr; // upid的数值
+	struct pid_namespace *ns; // 可见该upid的pid命名空间
 };
 
 struct pid
@@ -67,6 +68,12 @@ struct pid
 	/* wait queue for pidfd notifications */
 	wait_queue_head_t wait_pidfd;
 	struct rcu_head rcu;
+
+	/**
+	 * 默认一个进程只包含在全局命名空间
+	 * 当线程属于多个命名空间时，仅需在对pid进行动态分配时增加更多空间(level值)
+	 * 用作upid结构
+	*/
 	struct upid numbers[1];
 };
 
