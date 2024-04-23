@@ -1137,7 +1137,52 @@ struct xa_node {
 		unsigned long	tags[XA_MAX_MARKS][XA_MARK_LONGS];
 		unsigned long	marks[XA_MAX_MARKS][XA_MARK_LONGS];
 	};
+	/**
+ * xarray->xa_head = xa_node0
+                  +-------------------------------+
+                  |parent   = NULL                |
+                  |shift    = 8                   |
+                  |max_index= (1 << (8 + 4)) - 1  |
+                  |offset                         |
+                  |                               |
+                  |slots[XA_CHUNK_SIZE]           |
+                  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                  |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+                  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                       |                         |
+                       |                         |
+                       v                         v
+       xa_node2                                  xa_node1
+       +-------------------------------+         +-------------------------------+
+       |parent   = xa_node0            |         |parent   = xa_node0            |
+       |shift    = 4                   |         |shift    = 4                   |
+       |max_index= (1 << (4 + 4)) - 1  |         |max_index= (1 << (4 + 4)) - 1  |
+       |offset   = d                   |         |offset   = 0                   |
+       |                               |         |                               |
+       |slots[XA_CHUNK_SIZE]           |         |slots[XA_CHUNK_SIZE]           |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|         |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                                    |                         |
+                                    |                         +--> [0x090, 0x09f]
+                                    v
+                    xa_node3
+                    +-------------------------------+
+                    |parent   = xa_node2            |
+                    |shift    = 0                   |
+                    |max_index= (1 << 4) - 1        |
+                    |offset   = 1                   |
+                    |                               |
+                    |slots[XA_CHUNK_SIZE]           |
+                    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                    |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+                    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                       |                 |
+                       |                 +--> 0xd15
+                       +--> 0xd1e
+*/
 };
+
 
 void xa_dump(const struct xarray *);
 void xa_dump_node(const struct xa_node *);
