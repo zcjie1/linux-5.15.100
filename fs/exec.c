@@ -1715,6 +1715,10 @@ static int search_binary_handler(struct linux_binprm *bprm)
 	struct linux_binfmt *fmt;
 	int retval;
 
+	/**
+	 * Fill the binprm structure from the inode.
+	 * Read the first BINPRM_BUF_SIZE bytes
+	*/
 	retval = prepare_binprm(bprm);
 	if (retval < 0)
 		return retval;
@@ -1731,6 +1735,7 @@ static int search_binary_handler(struct linux_binprm *bprm)
 			continue;
 		read_unlock(&binfmt_lock);
 
+		// 加载新程序
 		retval = fmt->load_binary(bprm);
 
 		read_lock(&binfmt_lock);
@@ -1740,23 +1745,26 @@ static int search_binary_handler(struct linux_binprm *bprm)
 			return retval;
 		}
 	}
+	// 所有的处理程序都不能成功加载新程序
 	read_unlock(&binfmt_lock);
 
 	if (need_retry) {
 		if (printable(bprm->buf[0]) && printable(bprm->buf[1]) &&
 		    printable(bprm->buf[2]) && printable(bprm->buf[3]))
 			return retval;
-		if (request_module("binfmt-%04x", *(ushort *)(bprm->buf + 2)) < 0)
+		if (request_module("binfmt-%04x", *(ushort *)(bprm->buf + 2)) < 0) // 加载相应的内核模块
 			return retval;
 		need_retry = false;
-		goto retry;
+		goto retry; // 重试
 	}
 
 	return retval;
 }
 
+// for循环退出条件可以改动
 static int exec_binprm(struct linux_binprm *bprm)
 {
+	// 当前进程的PID，在父进程pid命名空间内的PID
 	pid_t old_pid, old_vpid;
 	int ret, depth;
 
@@ -1772,17 +1780,18 @@ static int exec_binprm(struct linux_binprm *bprm)
 		if (depth > 5)
 			return -ELOOP;
 
+		// 根据二进制格式的不同查找合适的解释器程序
 		ret = search_binary_handler(bprm);
 		if (ret < 0)
 			return ret;
 		if (!bprm->interpreter)
 			break;
 
-		exec = bprm->file;
+		exec = bprm->file; // 可执行文件
 		bprm->file = bprm->interpreter;
 		bprm->interpreter = NULL;
 
-		allow_write_access(exec);
+		allow_write_access(exec); //允许写访问新程序的可执行文件
 		if (unlikely(bprm->have_execfd)) {
 			if (bprm->executable) {
 				fput(exec);
@@ -1793,10 +1802,10 @@ static int exec_binprm(struct linux_binprm *bprm)
 			fput(exec);
 	}
 
-	audit_bprm(bprm);
-	trace_sched_process_exec(current, old_pid, bprm);
-	ptrace_event(PTRACE_EVENT_EXEC, old_vpid);
-	proc_exec_connector(current);
+	audit_bprm(bprm); // 统计
+	trace_sched_process_exec(current, old_pid, bprm); // 跟踪新程序的执行情况
+	ptrace_event(PTRACE_EVENT_EXEC, old_vpid); // 向父进程发送PTRACE_EVENT_EXEC 事件
+	proc_exec_connector(current); // 通知进程连接器有新程序的执行事件
 	return 0;
 }
 
@@ -1809,18 +1818,22 @@ static int bprm_execve(struct linux_binprm *bprm,
 	struct file *file;
 	int retval;
 
+	// 准备新程序的执行凭证
 	retval = prepare_bprm_creds(bprm);
 	if (retval)
 		return retval;
 
+	// 检查新程序是否是不安全的
 	check_unsafe_exec(bprm);
 	current->in_execve = 1;
 
+	// 打开新程序的可执行文件
 	file = do_open_execat(fd, filename, flags);
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto out_unmark;
 
+	// 在进程切换之前执行必要的清理和刷新操作，可以选择其他CPU执行新进程
 	sched_exec();
 
 	bprm->file = file;
@@ -1841,6 +1854,7 @@ static int bprm_execve(struct linux_binprm *bprm,
 	if (retval)
 		goto out;
 
+	// 执行新程序
 	retval = exec_binprm(bprm);
 	if (retval < 0)
 		goto out;
@@ -1897,6 +1911,7 @@ static int do_execveat_common(int fd, struct filename *filename,
 	 * further execve() calls fail. */
 	current->flags &= ~PF_NPROC_EXCEEDED;
 
+	// bprm初始化(进程地址空间分配，栈初始化...)
 	bprm = alloc_bprm(fd, filename);
 	if (IS_ERR(bprm)) {
 		retval = PTR_ERR(bprm);
@@ -1946,6 +1961,7 @@ static int do_execveat_common(int fd, struct filename *filename,
 		bprm->argc = 1;
 	}
 
+	// 开始执行
 	retval = bprm_execve(bprm, fd, filename, flags);
 out_free:
 	free_bprm(bprm);

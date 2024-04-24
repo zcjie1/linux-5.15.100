@@ -16,8 +16,8 @@ struct filename;
  */
 struct linux_binprm {
 #ifdef CONFIG_MMU
-	struct vm_area_struct *vma;
-	unsigned long vma_pages;
+	struct vm_area_struct *vma; // 存储新程序的地址空间
+	unsigned long vma_pages; // 新程序所占的虚拟内存页数
 #else
 # define MAX_ARG_PAGES	32
 	struct page *page[MAX_ARG_PAGES];
@@ -46,8 +46,8 @@ struct linux_binprm {
 	unsigned int taso:1;
 #endif
 	struct file *executable; /* Executable to pass to the interpreter */
-	struct file *interpreter;
-	struct file *file;
+	struct file *interpreter; // 解释器文件
+	struct file *file; // 当前进程的执行文件？
 	struct cred *cred;	/* new credentials */
 	int unsafe;		/* how unsafe this exec is (mask of LSM_UNSAFE_*) */
 	unsigned int per_clear;	/* bits to clear in current->personality */
