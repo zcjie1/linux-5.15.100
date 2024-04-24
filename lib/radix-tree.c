@@ -1533,6 +1533,7 @@ void __rcu **idr_get_free(struct radix_tree_root *root,
 		slot = &node->slots[offset];
 	}
 
+	// start即为分配的PID
 	iter->index = start;
 	if (node)
 		iter->next_index = 1 + min(max, (start | node_maxindex(node)));

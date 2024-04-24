@@ -43,10 +43,13 @@ int idr_alloc_u32(struct idr *idr, void *ptr, u32 *nextid,
 
 	id = (id < base) ? 0 : id - base;
 	radix_tree_iter_init(&iter, id);
+
+	// 分配PID，并直接存储至iter->index，返回存储PID的节点指针slot
 	slot = idr_get_free(&idr->idr_rt, &iter, gfp, max - base);
 	if (IS_ERR(slot))
 		return PTR_ERR(slot);
-
+	
+	// 更新idr结构体中的idr_netx
 	*nextid = iter.index + base;
 	/* there is a memory barrier inside radix_tree_iter_replace() */
 	radix_tree_iter_replace(&idr->idr_rt, &iter, slot, ptr);

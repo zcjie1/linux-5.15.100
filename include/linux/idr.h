@@ -59,6 +59,7 @@ struct idr {
  * idr_get_cursor - Return the current position of the cyclic allocator
  * @idr: idr handle
  *
+ * 返回idr_next，即下一个ID相对于idr_base的偏移
  * The value returned is the value that will be next returned from
  * idr_alloc_cyclic() if it is free (otherwise the search will start from
  * this position).

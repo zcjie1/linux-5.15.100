@@ -209,6 +209,7 @@ struct pid *alloc_pid(struct pid_namespace *ns, pid_t *set_tid,
 		spin_lock_irq(&pidmap_lock);
 
 		if (tid) {
+			// 分配进程PID
 			nr = idr_alloc(&tmp->idr, NULL, tid,
 				       tid + 1, GFP_ATOMIC);
 			/*
@@ -435,6 +436,7 @@ struct task_struct *find_get_task_by_vpid(pid_t nr)
 	return task;
 }
 
+// 通过task_struct找到对应的pid结构
 struct pid *get_task_pid(struct task_struct *task, enum pid_type type)
 {
 	struct pid *pid;
@@ -483,8 +485,13 @@ pid_t pid_nr_ns(struct pid *pid, struct pid_namespace *ns)
 }
 EXPORT_SYMBOL_GPL(pid_nr_ns);
 
+/**
+ * 返回pid对应线程，在当前线程current眼中的PID
+ * pid对应线程必须层级低于当前current，即current的pid命名空间层次较高
+*/
 pid_t pid_vnr(struct pid *pid)
 {
+	// task_active_pid_ns(current)找出current对应的最底层的pid命名空间
 	return pid_nr_ns(pid, task_active_pid_ns(current));
 }
 EXPORT_SYMBOL_GPL(pid_vnr);
@@ -504,6 +511,7 @@ pid_t __task_pid_nr_ns(struct task_struct *task, enum pid_type type,
 }
 EXPORT_SYMBOL(__task_pid_nr_ns);
 
+// tsk -> thread_pid -> 对应当前level的pid命名空间
 struct pid_namespace *task_active_pid_ns(struct task_struct *tsk)
 {
 	return ns_of_pid(task_pid(tsk));
