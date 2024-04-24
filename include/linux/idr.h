@@ -18,8 +18,8 @@
 
 struct idr {
 	struct radix_tree_root	idr_rt;
-	unsigned int		idr_base;
-	unsigned int		idr_next;
+	unsigned int		idr_base; // ID分配的起始地址
+	unsigned int		idr_next; // 下一个ID的偏移
 };
 
 /*

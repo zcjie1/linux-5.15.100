@@ -88,6 +88,7 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 		goto out;
 
 	err = -ENOMEM;
+	// 分配pid命名空间内存并清零
 	ns = kmem_cache_zalloc(pid_ns_cachep, GFP_KERNEL);
 	if (ns == NULL)
 		goto out_dec;

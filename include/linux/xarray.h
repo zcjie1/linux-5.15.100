@@ -1356,10 +1356,10 @@ struct xa_state {
 	struct xarray *xa;
 	unsigned long xa_index;
 	unsigned char xa_shift;
-	unsigned char xa_sibs;
+	unsigned char xa_sibs;	// 用于指数存储，详情见https://richardweiyang-2.gitbook.io/kernel-exploring/00-index-2/04-xarray
 	unsigned char xa_offset;
 	unsigned char xa_pad;		/* Helps gcc generate better code */
-	struct xa_node *xa_node;
+	struct xa_node *xa_node; // 在xarray的操作过程中，利用xa_node节点保存状态和返回值
 	struct xa_node *xa_alloc;
 	xa_update_node_t xa_update;
 };

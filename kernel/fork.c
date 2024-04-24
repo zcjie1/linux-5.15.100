@@ -2028,6 +2028,7 @@ static __latent_entropy struct task_struct *copy_process(
 		goto fork_out;
 
 	retval = -ENOMEM;
+	// 复制当前进程task struct
 	p = dup_task_struct(current, node);
 	if (!p)
 		goto fork_out;
@@ -2682,6 +2683,7 @@ SYSCALL_DEFINE0(vfork)
 }
 #endif
 
+// clone系统调用
 #ifdef __ARCH_WANT_SYS_CLONE
 #ifdef CONFIG_CLONE_BACKWARDS
 SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
