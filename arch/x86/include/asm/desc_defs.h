@@ -81,9 +81,10 @@ struct idt_data {
 	const void	*addr;
 };
 
+// IDT描述符结构
 struct gate_struct {
-	u16		offset_low;
-	u16		segment;
+	u16		offset_low; // 段内偏移
+	u16		segment; // 段选择子
 	struct idt_bits	bits;
 	u16		offset_middle;
 #ifdef CONFIG_X86_64
@@ -92,6 +93,7 @@ struct gate_struct {
 #endif
 } __attribute__((packed));
 
+// IDT描述符
 typedef struct gate_struct gate_desc;
 
 static inline unsigned long gate_offset(const gate_desc *g)

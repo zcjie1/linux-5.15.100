@@ -150,6 +150,7 @@ request_threaded_irq(unsigned int irq, irq_handler_t handler,
 
 /**
  * request_irq - Add a handler for an interrupt line
+ *  注册的只是软件层面的IRQ号，具体的硬件中断号由中断控制器分配
  * @irq:	The interrupt line to allocate
  * @handler:	Function to be called when the IRQ occurs.
  *		Primary handler for threaded interrupts

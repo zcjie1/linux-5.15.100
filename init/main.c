@@ -995,7 +995,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	setup_log_buf(0);
 	vfs_caches_init_early();
 	sort_main_extable();
-	trap_init();
+	trap_init(); // 系统异常处理
 	mm_init();
 
 	ftrace_init();

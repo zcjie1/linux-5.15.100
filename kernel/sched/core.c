@@ -6468,6 +6468,13 @@ static void sched_update_worker(struct task_struct *tsk)
 	}
 }
 
+/**
+ * 执行真正进程调度(即此函数)时机:
+ * 	1. 系统调用返回用户空间时(ret_to_user函数)
+ * 	2. 中断完成后返回用户空间时
+ *  3. 中断完成返回到内核空间时(需要使能内核抢占)
+ *  4. 使能内核抢占时
+*/
 asmlinkage __visible void __sched schedule(void)
 {
 	struct task_struct *tsk = current;
@@ -6479,7 +6486,7 @@ asmlinkage __visible void __sched schedule(void)
 		// 不需要将死锁预防移入循环，是因为每次调度的进程必然是Running状态的
 		preempt_disable(); // 当前进程执行
 		__schedule(SM_NONE); // 在函数中实现了进程的切换 A->B
-		sched_preempt_enable_no_resched(); // B进程执行抢占的使能
+		sched_preempt_enable_no_resched(); // B进程执行抢占的使能(已经切换到B进程)
 
 		/*检查当前进程B是否需要重新调度(NEED_RESCHED被置位)
 		 *当某个进程耗尽分配的时间片时，scheduler_tick()就会设置这个标志

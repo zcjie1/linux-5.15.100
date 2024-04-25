@@ -1183,6 +1183,7 @@ DEFINE_IDTENTRY_SW(iret_error)
 }
 #endif
 
+// 系统异常处理函数设置
 void __init trap_init(void)
 {
 	/* Init cpu_entry_area before IST entries are set up */

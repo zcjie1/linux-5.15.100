@@ -417,6 +417,7 @@ static inline void init_idt_data(struct idt_data *data, unsigned int n,
 	data->bits.p	= 1;
 }
 
+// 将idt_data的数据存入gate_desc中
 static inline void idt_init_desc(gate_desc *gate, const struct idt_data *d)
 {
 	unsigned long addr = (unsigned long) d->addr;

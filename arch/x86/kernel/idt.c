@@ -27,11 +27,11 @@
 		.segment	= _segment,		\
 	}
 
-/* Interrupt gate */
+/* Interrupt gate 内核级描述符*/
 #define INTG(_vector, _addr)				\
 	G(_vector, _addr, DEFAULT_STACK, GATE_INTERRUPT, DPL0, __KERNEL_CS)
 
-/* System interrupt gate */
+/* System interrupt gate 用户级描述符*/
 #define SYSG(_vector, _addr)				\
 	G(_vector, _addr, DEFAULT_STACK, GATE_INTERRUPT, DPL3, __KERNEL_CS)
 
@@ -155,9 +155,16 @@ static const __initconst struct idt_data apic_idts[] = {
 #endif
 };
 
-/* Must be page-aligned because the real IDT is used in the cpu entry area */
+/**
+ * Must be page-aligned because the real IDT is used in the cpu entry area
+ * 中断描述符表IDT
+ * IDT表项对应的index为硬件中断号
+ * 同时硬件中断号ID会映射到一个软件IRQ号
+ * 通过IRQ号找到对应的处理函数
+*/
 static gate_desc idt_table[IDT_ENTRIES] __page_aligned_bss;
 
+// IDTR寄存器内容
 static struct desc_ptr idt_descr __ro_after_init = {
 	.size		= IDT_TABLE_SIZE - 1,
 	.address	= (unsigned long) idt_table,
@@ -176,6 +183,7 @@ bool idt_is_f00f_address(unsigned long address)
 }
 #endif
 
+// 设置IDT表项
 static __init void
 idt_setup_from_table(gate_desc *idt, const struct idt_data *t, int size, bool sys)
 {
@@ -269,6 +277,7 @@ void __init idt_setup_apic_and_irq_gates(void)
 	int i = FIRST_EXTERNAL_VECTOR;
 	void *entry;
 
+	// 设置特定中断描述符项(如定时器中断，温度中断，IPI中断)
 	idt_setup_from_table(idt_table, apic_idts, ARRAY_SIZE(apic_idts), true);
 
 	for_each_clear_bit_from(i, system_vectors, FIRST_SYSTEM_VECTOR) {
