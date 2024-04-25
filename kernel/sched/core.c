@@ -6469,10 +6469,16 @@ static void sched_update_worker(struct task_struct *tsk)
 }
 
 /**
- * 执行真正进程调度(即此函数)时机:
+ * 设置调度标记时机:
+ *  1. scheduler_tick 时钟中断
+ *  2. wake_up_process 唤醒进程
+ *  3. do_fork 创建新进程的时候
+ *  4. set_user_nice 修改进程nice值(改变进程静态优先级)
+ * 
+ * 执行真正进程调度时机:
  * 	1. 系统调用返回用户空间时(ret_to_user函数)
- * 	2. 中断完成后返回用户空间时
- *  3. 中断完成返回到内核空间时(需要使能内核抢占)
+ * 	2. 中断完成后返回用户空间时(ret_to_user函数)
+ *  3. 中断完成返回到内核空间时(需要使能内核抢占，且只在缺页异常等系统中断中被调用)
  *  4. 使能内核抢占时
 */
 asmlinkage __visible void __sched schedule(void)

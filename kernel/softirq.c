@@ -539,7 +539,7 @@ restart:
 	/* Reset the pending bitmask before enabling irqs */
 	set_softirq_pending(0);
 
-	local_irq_enable();
+	local_irq_enable(); // 使能硬件中断
 
 	h = softirq_vec;
 
@@ -579,7 +579,7 @@ restart:
 		    --max_restart)
 			goto restart;
 
-		wakeup_softirqd();
+		wakeup_softirqd(); // 调度时机
 	}
 
 	account_softirq_exit(current);
@@ -911,14 +911,14 @@ static int ksoftirqd_should_run(unsigned int cpu)
 
 static void run_ksoftirqd(unsigned int cpu)
 {
-	ksoftirqd_run_begin();
+	ksoftirqd_run_begin(); // 禁止硬中断
 	if (local_softirq_pending()) {
 		/*
 		 * We can safely run softirq on inline stack, as we are not deep
 		 * in the task stack here.
 		 */
 		__do_softirq();
-		ksoftirqd_run_end();
+		ksoftirqd_run_end(); // 使能硬中断
 		cond_resched();
 		return;
 	}
