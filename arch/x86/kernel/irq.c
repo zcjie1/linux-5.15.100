@@ -236,6 +236,26 @@ static __always_inline void handle_irq(struct irq_desc *desc,
 /*
  * common_interrupt() handles all normal device IRQ's (the special SMP
  * cross-CPU interrupts have their own entry points).
+ * #define DEFINE_IDTENTRY_IRQ(func) \
+    static void __ ## func(struct pt_regs *regs, u32 vector); \
+    __visible noinstr void func(struct pt_regs *regs, unsigned long error_code) { \
+        irqentry_state_t state = irqentry_enter(regs); \
+        u32 vector = (u32)(u8)error_code; \
+        instrumentation_begin(); \
+        kvm_set_cpu_l1tf_flush_l1d(); \
+        run_irq_on_irqstack_cond(__ ## func, regs, vector); \
+        instrumentation_end(); \
+        irqentry_exit(regs, state); \
+    } \
+    static noinline void __ ## func(struct pt_regs *regs, u32 vector)
+首先，宏展开后的 func 函数会执行以下操作：
+ 1. 进入中断入口（irqentry_enter）状态
+ 2. 从 error_code 中提取 vector
+ 3. 开始仪器化（instrumentation_begin）
+ 4. 设置 L1TF 刷新 L1D 缓存（kvm_set_cpu_l1tf_flush_l1d）
+ 5. 在 IRQ 栈上运行 __func 函数
+ 6. 结束仪器化（instrumentation_end）
+ 7. 退出中断入口状态（irqentry_exit）
  */
 DEFINE_IDTENTRY_IRQ(common_interrupt)
 {

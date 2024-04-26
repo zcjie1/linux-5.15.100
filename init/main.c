@@ -1421,6 +1421,7 @@ static void __init do_basic_setup(void)
 	do_initcalls();
 }
 
+// 启动ksoftirq线程，见"early_initcall(spawn_ksoftirqd);"
 static void __init do_pre_smp_initcalls(void)
 {
 	initcall_entry_t *fn;
@@ -1514,7 +1515,7 @@ static int __ref kernel_init(void *unused)
 	 */
 	wait_for_completion(&kthreadd_done);
 
-	kernel_init_freeable();
+	kernel_init_freeable(); // 创建ksoftirq线程，net_dev_init等
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
 	kprobe_free_init_mem();
@@ -1612,7 +1613,7 @@ static noinline void __init kernel_init_freeable(void)
 	init_mm_internals();
 
 	rcu_init_tasks_generic();
-	do_pre_smp_initcalls();
+	do_pre_smp_initcalls(); // ksoftirq创建，net_dev_init
 	lockup_detector_init();
 
 	smp_init();

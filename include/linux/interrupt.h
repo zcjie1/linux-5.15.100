@@ -513,6 +513,7 @@ DECLARE_STATIC_KEY_FALSE(force_irqthreads_key);
    al. should be converted to tasklets, not to softirqs.
  */
 
+// 软中断类型
 enum
 {
 	HI_SOFTIRQ=0,

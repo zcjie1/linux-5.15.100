@@ -965,6 +965,7 @@ static int igb_request_msix(struct igb_adapter *adapter)
 		else
 			sprintf(q_vector->name, "%s-unused", netdev->name);
 
+		// 注册中断处理函数igb_msix_ring
 		err = request_irq(adapter->msix_entries[vector].vector,
 				  igb_msix_ring, 0, q_vector->name,
 				  q_vector);
@@ -1172,6 +1173,7 @@ static void igb_add_ring(struct igb_ring *ring,
 
 /**
  *  igb_alloc_q_vector - Allocate memory for a single interrupt vector
+ *  注册NAPI机制所需的poll操作函数-igb_poll
  *  @adapter: board private structure to initialize
  *  @v_count: q_vectors allocated on adapter, used for ring interleaving
  *  @v_idx: index of vector in adapter struct
@@ -3222,6 +3224,7 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* hw->hw_addr can be altered, we'll use adapter->io_addr for unmap */
 	hw->hw_addr = adapter->io_addr;
 
+	// 注册网卡操作函数
 	netdev->netdev_ops = &igb_netdev_ops;
 	igb_set_ethtool_ops(netdev);
 	netdev->watchdog_timeo = 5 * HZ;
@@ -3247,7 +3250,7 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (err)
 		goto err_sw_init;
 
-	/* setup the private structure */
+	/* setup the private structure, 注册NAPI所需的poll函数 */
 	err = igb_sw_init(adapter);
 	if (err)
 		goto err_sw_init;
@@ -4090,6 +4093,7 @@ static int __igb_open(struct net_device *netdev, bool resuming)
 	 */
 	igb_configure(adapter);
 
+	// 为每个RX接收队列注册中断号
 	err = igb_request_irq(adapter);
 	if (err)
 		goto err_req_irq;
