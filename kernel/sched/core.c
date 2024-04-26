@@ -43,6 +43,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(sched_util_est_cfs_tp);
 EXPORT_TRACEPOINT_SYMBOL_GPL(sched_util_est_se_tp);
 EXPORT_TRACEPOINT_SYMBOL_GPL(sched_update_nr_running_tp);
 
+// 定义runqueue
 DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 
 #ifdef CONFIG_SCHED_DEBUG
@@ -5647,7 +5648,7 @@ __pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	 * opportunity to pull in more work from other CPUs.
 	 */
 	if (likely(prev->sched_class <= &fair_sched_class &&
-		   rq->nr_running == rq->cfs.h_nr_running)) {
+		   rq->nr_running == rq->cfs.h_nr_running)) { // runqueue的任务数量 == cfs调度器管理的任务数量
 		
 		// CFS公平调度
 		p = pick_next_task_fair(rq, prev, rf);
@@ -6266,7 +6267,7 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 	int cpu;
 
 	cpu = smp_processor_id();
-	rq = cpu_rq(cpu);
+	rq = cpu_rq(cpu); // 当前cpu的runqueue
 	prev = rq->curr;
 
 	schedule_debug(prev, !!sched_mode);
@@ -6327,6 +6328,7 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 
 			// 若有贡献，则runqueue不可中断任务计数++
 			// 该计数在ttwu函数中会被--，计数总量与CPU核个数保持相当
+			// 暂不清楚出于什么考虑
 			if (prev->sched_contributes_to_load)
 				rq->nr_uninterruptible++;
 

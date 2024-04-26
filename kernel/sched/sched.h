@@ -914,6 +914,7 @@ DECLARE_STATIC_KEY_FALSE(sched_uclamp_used);
 
 /*
  * This is the main, per-CPU runqueue data structure.
+ * runqueue结构体
  *
  * Locking rule: those places that want to lock multiple runqueues
  * (such as the load balancing or the thread migration code), lock
@@ -1148,6 +1149,7 @@ static inline bool is_migration_disabled(struct task_struct *p)
 #endif
 }
 
+// 声明 runqueue
 DECLARE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 
 #define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))

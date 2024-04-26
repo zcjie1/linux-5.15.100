@@ -651,11 +651,15 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
 
 /*
  * The idea is to set a period in which each task runs once.
+ * 
+ * 当进程数目小于8时，调度周期 = 6ms
+ * 当进程数目大于8时，调度周期 = 进程数 * 0.75ms * [1+log2(nr_cpus)]
  *
  * When there are too many tasks (sched_nr_latency) we have to stretch
  * this period because otherwise the slices get too small.
  *
  * p = (nr <= nl) ? l : l*nr/nl
+ * 
  */
 static u64 __sched_period(unsigned long nr_running)
 {
@@ -4327,6 +4331,7 @@ static void check_spread(struct cfs_rq *cfs_rq, struct sched_entity *se)
 #endif
 }
 
+// 微调vruntime
 static void
 place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 {
@@ -4338,7 +4343,7 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 	 * little, place the new task so that it fits in the slot that
 	 * stays open at the end.
 	 */
-	if (initial && sched_feat(START_DEBIT))
+	if (initial && sched_feat(START_DEBIT)) // 用于创建新进程时
 		vruntime += sched_vslice(cfs_rq, se);
 
 	/* sleeps up to a single latency don't count. */
@@ -7419,7 +7424,7 @@ pick_next_task_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf
 	int new_tasks;
 
 again:
-	if (!sched_fair_runnable(rq))
+	if (!sched_fair_runnable(rq)) // 若runqueue为空
 		goto idle;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
@@ -7435,7 +7440,7 @@ again:
 	 */
 
 	do {
-		struct sched_entity *curr = cfs_rq->curr;
+		struct sched_entity *curr = cfs_rq->curr; // 当前进程的调度实体
 
 		/*
 		 * Since we got here without doing put_prev_entity() we also
@@ -7445,7 +7450,7 @@ again:
 		 */
 		if (curr) {
 			if (curr->on_rq)
-				update_curr(cfs_rq);
+				update_curr(cfs_rq); // 更新vruntime
 			else
 				curr = NULL;
 
@@ -7466,6 +7471,9 @@ again:
 		}
 
 		se = pick_next_entity(cfs_rq, curr);
+
+		// 判断当前的调度实体是 group se 还是进程 se
+		// 若为group_se，则返回它的自有调度队列
 		cfs_rq = group_cfs_rq(se);
 	} while (cfs_rq);
 
@@ -7479,7 +7487,7 @@ again:
 	if (prev != p) {
 		struct sched_entity *pse = &prev->se;
 
-		while (!(cfs_rq = is_same_group(se, pse))) {
+		while (!(cfs_rq = is_same_group(se, pse))) { // 当不属于同个调度组时
 			int se_depth = se->depth;
 			int pse_depth = pse->depth;
 
@@ -7501,7 +7509,7 @@ again:
 simple:
 #endif
 	if (prev)
-		put_prev_task(rq, prev);
+		put_prev_task(rq, prev); // 更新prev任务的运行时间，并重新插入红黑树
 
 	do {
 		se = pick_next_entity(cfs_rq, NULL);
@@ -11868,7 +11876,7 @@ static unsigned int get_rr_interval_fair(struct rq *rq, struct task_struct *task
 }
 
 /*
- * All the scheduling class methods:
+ * All the scheduling class methods: CFS公平调度器
  */
 DEFINE_SCHED_CLASS(fair) = {
 

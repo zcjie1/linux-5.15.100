@@ -524,6 +524,7 @@ struct sched_statistics {
 #endif
 };
 
+// 调度实体
 struct sched_entity {
 	/* For load-balancing: */
 	struct load_weight		load;
