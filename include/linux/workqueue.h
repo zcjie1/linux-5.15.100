@@ -94,6 +94,7 @@ enum {
 	WORKER_DESC_LEN		= 24,
 };
 
+// 工作队列
 struct work_struct {
 	atomic_long_t data;
 	struct list_head entry;

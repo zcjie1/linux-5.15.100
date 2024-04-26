@@ -522,7 +522,7 @@ enum
 	NET_RX_SOFTIRQ,
 	BLOCK_SOFTIRQ,
 	IRQ_POLL_SOFTIRQ,
-	TASKLET_SOFTIRQ,
+	TASKLET_SOFTIRQ, // 绑定CPU，不会并发执行
 	SCHED_SOFTIRQ,
 	HRTIMER_SOFTIRQ,
 	RCU_SOFTIRQ,    /* Preferable RCU should always be the last softirq */

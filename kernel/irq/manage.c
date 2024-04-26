@@ -2103,8 +2103,9 @@ const void *free_nmi(unsigned int irq, void *dev_id)
 
 /**
  *	request_threaded_irq - allocate an interrupt line
+ *	中断线程，运行在进程上下文(而非中断上下文)
  *	@irq: Interrupt line to allocate
- *	@handler:(中断预处理函数) Function to be called when the IRQ occurs.
+ *	@handler:(硬中断处理函数) Function to be called when the IRQ occurs.
  *		  Primary handler for threaded interrupts.
  *		  If handler is NULL and thread_fn != NULL
  *		  the default primary handler is installed.
