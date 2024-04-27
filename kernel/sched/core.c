@@ -5647,7 +5647,8 @@ __pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	 * higher scheduling class, because otherwise those lose the
 	 * opportunity to pull in more work from other CPUs.
 	 */
-	if (likely(prev->sched_class <= &fair_sched_class &&
+	// 各类调度器定义的section位置不同，可以通过地址大小比较，详情见DEFINE_SCHED_CLASS宏和vmlinux.lds链接脚本
+	if (likely(prev->sched_class <= &fair_sched_class && 
 		   rq->nr_running == rq->cfs.h_nr_running)) { // runqueue的任务数量 == cfs调度器管理的任务数量
 		
 		// CFS公平调度
