@@ -267,10 +267,10 @@ extern unsigned int kobjsize(const void *objp);
  */
 #define VM_NONE		0x00000000
 
-#define VM_READ		0x00000001	/* currently active flags */
-#define VM_WRITE	0x00000002
-#define VM_EXEC		0x00000004
-#define VM_SHARED	0x00000008
+#define VM_READ		0x00000001	/* currently active flags 可读 */ 
+#define VM_WRITE	0x00000002	// 可写
+#define VM_EXEC		0x00000004	// 可执行
+#define VM_SHARED	0x00000008	// 可多进程共享
 
 /* mprotect() hardcodes VM_MAYREAD >> 4 == VM_READ, and so for r/w/x bits. */
 #define VM_MAYREAD	0x00000010	/* limits for mprotect() etc */
@@ -283,12 +283,12 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_PFNMAP	0x00000400	/* Page-ranges managed without "struct page", just pure PFN */
 #define VM_UFFD_WP	0x00001000	/* wrprotect pages tracking */
 
-#define VM_LOCKED	0x00002000
-#define VM_IO           0x00004000	/* Memory mapped I/O or similar */
+#define VM_LOCKED	0x00002000 // 不可换出到磁盘
+#define VM_IO           0x00004000	/* Memory mapped I/O or similar 可映射至设备IO空间 */
 
 					/* Used by sys_madvise() */
-#define VM_SEQ_READ	0x00008000	/* App will access data sequentially */
-#define VM_RAND_READ	0x00010000	/* App will not benefit from clustered reads */
+#define VM_SEQ_READ	0x00008000	/* App will access data sequentially 顺序读写虚拟内存 */
+#define VM_RAND_READ	0x00010000	/* App will not benefit from clustered reads 随机读写虚拟内存 */
 
 #define VM_DONTCOPY	0x00020000      /* Do not copy this vma on fork */
 #define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */

@@ -11,7 +11,7 @@
  * The vmalloc() routines leaves a hole of 4kB between each vmalloced
  * area for the same reason. ;)
  */
-#define VMALLOC_OFFSET	(8 * 1024 * 1024)
+#define VMALLOC_OFFSET	(8 * 1024 * 1024) // 内核虚拟空间Normal映射区以上存在8M内存空洞
 
 #ifndef __ASSEMBLY__
 extern bool __vmalloc_start_set; /* set once high_memory is set */
@@ -21,7 +21,7 @@ extern bool __vmalloc_start_set; /* set once high_memory is set */
 #ifdef CONFIG_X86_PAE
 #define LAST_PKMAP 512
 #else
-#define LAST_PKMAP 1024
+#define LAST_PKMAP 1024 // 永久映射区可以映射的页数限制
 #endif
 
 #define CPU_ENTRY_AREA_PAGES		(NR_CPUS * DIV_ROUND_UP(sizeof(struct cpu_entry_area), PAGE_SIZE))
@@ -35,6 +35,7 @@ extern bool __vmalloc_start_set; /* set once high_memory is set */
 
 #define LDT_END_ADDR		(LDT_BASE_ADDR + PMD_SIZE)
 
+// 永久映射区起始地址
 #define PKMAP_BASE		\
 	((LDT_BASE_ADDR - PAGE_SIZE) & PMD_MASK)
 

@@ -324,9 +324,9 @@ struct vm_area_struct {
 					   within vm_mm. */
 
 	/* linked list of VM areas per task, sorted by address */
-	struct vm_area_struct *vm_next, *vm_prev;
+	struct vm_area_struct *vm_next, *vm_prev; // 双向链表用于高效遍历
 
-	struct rb_node vm_rb;
+	struct rb_node vm_rb; // 红黑树用于高效查找
 
 	/*
 	 * Largest free memory gap in bytes to the left of this VMA.
@@ -341,10 +341,13 @@ struct vm_area_struct {
 	struct mm_struct *vm_mm;	/* The address space we belong to. */
 
 	/*
-	 * Access permissions of this VMA.
+	 * Access permissions of this VMA. 虚拟区域的访问权限和行为规范
 	 * See vmf_insert_mixed_prot() for discussion.
 	 */
-	pgprot_t vm_page_prot;
+	// 页表属性，直接作用于物理页表中，针对页
+	pgprot_t vm_page_prot; 
+
+	// 抽象属性，针对虚拟内存区域整体
 	unsigned long vm_flags;		/* Flags, see mm.h. */
 
 	/*
@@ -364,15 +367,15 @@ struct vm_area_struct {
 	 */
 	struct list_head anon_vma_chain; /* Serialized by mmap_lock &
 					  * page_table_lock */
-	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */
+	struct anon_vma *anon_vma;	/* Serialized by page_table_lock 匿名映射 */
 
 	/* Function pointers to deal with this struct. */
 	const struct vm_operations_struct *vm_ops;
 
 	/* Information about our backing store: */
 	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
-					   units */
-	struct file * vm_file;		/* File we map to (can be NULL). */
+					   units 文件映射页偏移*/
+	struct file * vm_file;		/* File we map to (can be NULL). 文件映射 */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 
 #ifdef CONFIG_SWAP
@@ -416,7 +419,7 @@ struct mm_struct {
 		unsigned long mmap_compat_base;
 		unsigned long mmap_compat_legacy_base;
 #endif
-		unsigned long task_size;	/* size of task vm space */
+		unsigned long task_size;	/* size of task vm space 用户地址空间与内核地址空间分界线 */
 		unsigned long highest_vm_end;	/* highest vma end address */
 		pgd_t * pgd;
 
@@ -482,12 +485,12 @@ struct mm_struct {
 		unsigned long hiwater_rss; /* High-watermark of RSS usage */
 		unsigned long hiwater_vm;  /* High-water virtual memory usage */
 
-		unsigned long total_vm;	   /* Total pages mapped */
-		unsigned long locked_vm;   /* Pages that have PG_mlocked set */
-		atomic64_t    pinned_vm;   /* Refcount permanently increased */
-		unsigned long data_vm;	   /* VM_WRITE & ~VM_SHARED & ~VM_STACK */
-		unsigned long exec_vm;	   /* VM_EXEC & ~VM_WRITE & ~VM_STACK */
-		unsigned long stack_vm;	   /* VM_STACK */
+		unsigned long total_vm;	   /* Total pages mapped 建立映射的虚拟页数*/
+		unsigned long locked_vm;   /* Pages that have PG_mlocked set 不能换出的虚拟页数*/
+		atomic64_t    pinned_vm;   /* Refcount permanently increased 不能换出且不能移动的虚拟页数*/
+		unsigned long data_vm;	   /* VM_WRITE & ~VM_SHARED & ~VM_STACK 数据段虚拟页数*/
+		unsigned long exec_vm;	   /* VM_EXEC & ~VM_WRITE & ~VM_STACK 可执行文件的虚拟页数*/
+		unsigned long stack_vm;	   /* VM_STACK 栈虚拟页数*/
 		unsigned long def_flags;
 
 		/**
@@ -499,6 +502,14 @@ struct mm_struct {
 
 		spinlock_t arg_lock; /* protect the below fields */
 
+		/**
+		 * start_code, end_code: 代码段的起始位置和结束位置
+		 * start_data, end_data: 数据段的起始位置和结束位置
+		 * start_brk, brk: 堆的起始位置和当前位置
+		 * start_stack: 栈的起始位置
+		 * arg_start, arg_end: 参数列表，位于栈的最高地址处
+		 * env_start, env_end: 环境变量，位于栈的最高地址处
+		*/
 		unsigned long start_code, end_code, start_data, end_data;
 		unsigned long start_brk, brk, start_stack;
 		unsigned long arg_start, arg_end, env_start, env_end;

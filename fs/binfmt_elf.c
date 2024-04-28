@@ -1011,10 +1011,13 @@ out_free_interp:
 	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
 		current->flags |= PF_RANDOMIZE;
 
+	// 设置虚拟内存空间中的内存映射区域起始地址mmap_base, task_size等属性
 	setup_new_exec(bprm);
 
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
+	// 创建并初始化栈对应的 vm_area_struct 结构
+  	// 设置 mm->start_stack 栈的起始地址，并将 mm->arg_start 指向栈的起始地址
 	retval = setup_arg_pages(bprm, randomize_stack_top(STACK_TOP),
 				 executable_stack);
 	if (retval < 0)
@@ -1137,7 +1140,8 @@ out_free_interp:
 				goto out_free_dentry;
 			}
 		}
-
+		
+		// 将二进制文件中的代码部分映射到虚拟内存空间中
 		error = elf_map(bprm->file, load_bias + vaddr, elf_ppnt,
 				elf_prot, elf_flags, total_size);
 		if (BAD_ADDR(error)) {
@@ -1214,6 +1218,9 @@ out_free_interp:
 	 * for the bss and break sections.  We must do this before
 	 * mapping in the interpreter, to make sure it doesn't wind
 	 * up getting placed where the bss needs to go.
+	 * 
+	 * 创建并初始化堆对应的的 vm_area_struct 结构
+	 * 设置 current->mm->start_brk = current->mm->brk，设置堆的起始地址 start_brk，结束地址 brk。 起初两者相等表示堆是空的
 	 */
 	retval = set_brk(elf_bss, elf_brk, bss_prot);
 	if (retval)
@@ -1224,6 +1231,7 @@ out_free_interp:
 	}
 
 	if (interpreter) {
+		// 将进程依赖的动态链接库 .so 文件映射到虚拟内存空间中的内存映射区域
 		elf_entry = load_elf_interp(interp_elf_ex,
 					    interpreter,
 					    load_bias, interp_elf_phdata,
@@ -1271,6 +1279,7 @@ out_free_interp:
 	if (retval < 0)
 		goto out;
 
+	// 初始化内存描述符 mm_struct
 	mm = current->mm;
 	mm->end_code = end_code;
 	mm->start_code = start_code;

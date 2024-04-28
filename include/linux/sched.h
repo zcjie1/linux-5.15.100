@@ -857,6 +857,7 @@ struct task_struct {
 	struct rb_node			pushable_dl_tasks;
 #endif
 	/**
+	 * 进程虚拟地址空间
 	 * 对于内核线程，mm为NULL，active_mm为上一个线程的active_mm
 	 * 对于用户线程，mm = active_mm
 	*/
