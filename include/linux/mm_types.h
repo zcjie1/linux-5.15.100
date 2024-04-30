@@ -68,6 +68,7 @@ struct mem_cgroup;
 #endif
 
 struct page {
+	// 存储 page 的定位信息以及相关标志位
 	unsigned long flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
 	/*
@@ -82,11 +83,24 @@ struct page {
 			 * @lru: Pageout list, eg. active_list protected by
 			 * lruvec->lru_lock.  Sometimes used as a generic list
 			 * by the page owner.
+			 * 
+			 * least recently used —— 用于管理active和inactive页链表
+			 * swap内存页优先选择inactive页
 			 */
 			struct list_head lru;
-			/* See page-flags.h for PAGE_MAPPING_FLAGS */
+
+			/** See page-flags.h for PAGE_MAPPING_FLAGS 
+			 * 如果 page 为文件页的话，低位为0，指向 page 所在的 page cache
+			 * 如果 page 为匿名页的话，低位为1，指向其对应虚拟地址空间的匿名映射区 anon_vma
+			*/
 			struct address_space *mapping;
+
+			/**
+			 * 如果 page 为文件页的话，index 为 page 在 page cache 中的索引
+			 * 如果 page 为匿名页的话，表示匿名页在对应进程虚拟内存区域 VMA 中的偏移
+			*/
 			pgoff_t index;		/* Our offset within mapping. */
+
 			/**
 			 * @private: Mapping-private opaque data.
 			 * Usually used for buffer_heads if PagePrivate.
@@ -119,38 +133,40 @@ struct page {
 		};
 		struct {	/* slab, slob and slub */
 			union {
-				struct list_head slab_list;
+				struct list_head slab_list; // 用于指定当前 page 位于 slab 中的哪个具体管理链表上
 				struct {	/* Partial pages */
 					struct page *next;
 #ifdef CONFIG_64BIT
 					int pages;	/* Nr of pages left */
-					int pobjects;	/* Approximate count */
+					int pobjects;	/* Approximate count 表示 slab 中拥有的特定类型的对象个数 */
 #else
 					short int pages;
 					short int pobjects;
 #endif
 				};
 			};
-			struct kmem_cache *slab_cache; /* not slob */
+			struct kmem_cache *slab_cache; /* not slob 用于指向当前 page 所属的 slab 管理结构 */
 			/* Double-word boundary */
-			void *freelist;		/* first free object */
+			void *freelist;		/* first free object 指向 page 中的第一个未分配出去的空闲对象 */
 			union {
 				void *s_mem;	/* slab: first object */
 				unsigned long counters;		/* SLUB */
 				struct {			/* SLUB */
 					unsigned inuse:16;
 					unsigned objects:15;
-					unsigned frozen:1;
+
+					// 当前内存页 page 被 slab 放置在 CPU 本地缓存列表中，frozen = 1，否则 frozen = 0
+					unsigned frozen:1; 
 				};
 			};
 		};
 		struct {	/* Tail pages of compound page */
-			unsigned long compound_head;	/* Bit zero is set */
+			unsigned long compound_head;	/* Bit zero is set 复合页的尾页指向首页 */
 
 			/* First tail page only */
-			unsigned char compound_dtor;
-			unsigned char compound_order;
-			atomic_t compound_mapcount;
+			unsigned char compound_dtor; // 用于释放复合页的析构函数，保存在首页中
+			unsigned char compound_order; // 该复合页由多少个 page 组成
+			atomic_t compound_mapcount; // 该复合页被多少个进程使用，内存页反向映射的概念，首页中保存
 			unsigned int compound_nr; /* 1 << compound_order */
 		};
 		struct {	/* Second tail page of compound page */
@@ -189,7 +205,9 @@ struct page {
 			 */
 		};
 
-		/** @rcu_head: You can use this to free a page by RCU. */
+		/** @rcu_head: You can use this to free a page by RCU. 
+		 * 表示 slab 中需要释放回收的对象链表
+		*/
 		struct rcu_head rcu_head;
 	};
 
@@ -197,6 +215,8 @@ struct page {
 		/*
 		 * If the page can be mapped to userspace, encodes the number
 		 * of times this page is referenced by a page table.
+		 * 
+		 * 表示该 page 映射了多少个进程的虚拟内存空间
 		 */
 		atomic_t _mapcount;
 
