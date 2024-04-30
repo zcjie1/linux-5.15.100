@@ -19,6 +19,8 @@
  * The LOCK_PREFIX macro defined here replaces the LOCK and
  * LOCK_PREFIX macros used everywhere in the source tree.
  *
+ * UP = Uniprocessor System 单处理器操作系统
+ * 
  * SMP alternatives use the same data structures as the other
  * alternatives and the X86_FEATURE_UP flag to indicate the case of a
  * UP system running a SMP kernel.  The existing apply_alternatives()
@@ -34,9 +36,14 @@
  * and size information.  That keeps the table sizes small.
  */
 
+/** .long 671f  生成一个整数
+ * 值为下面的 671 标号的实际地址，f 表示向前引用，如果 671 标号出现在前面，要写 671b
+ * 在 .smp_locks 段生成四个字节的 lock 前缀的地址 
+ * 链接时，所有的 .smp_locks 段合并起来，形成一个包含所有 lock 指令地址的数组
+ */
 #ifdef CONFIG_SMP
 #define LOCK_PREFIX_HERE \
-		".pushsection .smp_locks,\"a\"\n"	\
+		".pushsection .smp_locks,\"a\"\n" /* a = allocatable */	\
 		".balign 4\n"				\
 		".long 671f - .\n" /* offset */		\
 		".popsection\n"				\
