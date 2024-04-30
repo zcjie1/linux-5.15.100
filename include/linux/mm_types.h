@@ -85,21 +85,27 @@ struct page {
 			 * by the page owner.
 			 * 
 			 * least recently used —— 用于管理active和inactive页链表
-			 * swap内存页优先选择inactive页
+			 * 四种LRU链表 (匿名页的 active 链表，inactive 链表和文件页的active 链表， inactive 链表)
+			 * 一种mlock链表(页不会被换出)
 			 */
-			struct list_head lru;
+			struct list_head lru; 
 
-			/** See page-flags.h for PAGE_MAPPING_FLAGS 
-			 * 如果 page 为文件页的话，低位为0，指向 page 所在的 page cache
-			 * 如果 page 为匿名页的话，低位为1，指向其对应虚拟地址空间的匿名映射区 anon_vma
+			/** See page-flags.h for PAGE_MAPPING_FLAGS
+			 * 最低两位用于判断类型，其他位数用于保存指向的地址
+			 * 1. 如果为空，则该页属于交换高速缓存(swap cache，swap时会产生竞争条件，用swap cache解决) 
+			 * 2. 如果 page 为文件页的话，低位为0，指向文件的address space
+			 * 3. 如果 page 为匿名页的话，低位为1，指向其对应虚拟地址空间的匿名映射区 anon_vma(分配时需要对齐)
 			*/
 			struct address_space *mapping;
 
 			/**
-			 * 如果 page 为文件页的话，index 为 page 在 page cache 中的索引
-			 * 如果 page 为匿名页的话，表示匿名页在对应进程虚拟内存区域 VMA 中的偏移
+			 * Our offset within mapping.
+			 * 作为不同的含义被几种内核成分使用:
+			 * 例如，它在页磁盘映像或匿名区中标识存放在页框中的数据的位置，或者它存放一个换出页标识符
+			 * 当 page 为文件页，index 为 page 在 page cache 中的索引
+			 * 当 page 为匿名页，表示匿名页在对应进程虚拟内存区域 VMA 中的偏移或是页的线性地址/PAGE_SIZE
 			*/
-			pgoff_t index;		/* Our offset within mapping. */
+			pgoff_t index;
 
 			/**
 			 * @private: Mapping-private opaque data.
@@ -384,6 +390,8 @@ struct vm_area_struct {
 	 * list, after a COW of one of the file pages.	A MAP_SHARED vma
 	 * can only be in the i_mmap tree.  An anonymous MAP_PRIVATE, stack
 	 * or brk vma (with NULL file) can only be in an anon_vma list.
+	 * 
+	 * 用于实现物理页到匿名虚拟页的反向映射
 	 */
 	struct list_head anon_vma_chain; /* Serialized by mmap_lock &
 					  * page_table_lock */
@@ -392,9 +400,11 @@ struct vm_area_struct {
 	/* Function pointers to deal with this struct. */
 	const struct vm_operations_struct *vm_ops;
 
-	/* Information about our backing store: */
-	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
-					   units 文件映射页偏移*/
+	/** Information about our backing store: 
+	 * 如果此vma用于映射文件，那么保存的是在映射文件中的偏移量。如果是匿名线性区，它等于0或者vma开始地址对应的虚拟页框
+	 * (vm_start >> PAGE_SIZE)，这个虚拟页框号用于vma向下增长时反向映射的计算(栈)
+	*/
+	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE units 文件映射页偏移*/
 	struct file * vm_file;		/* File we map to (can be NULL). 文件映射 */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 

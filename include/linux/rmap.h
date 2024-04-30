@@ -28,13 +28,16 @@
  */
 struct anon_vma {
 	struct anon_vma *root;		/* Root of this anon_vma tree */
-	struct rw_semaphore rwsem;	/* W: modification, R: walking the list */
+	struct rw_semaphore rwsem;	/* W: modification, R: walking the list 读写信号量 */
 	/*
 	 * The refcount is taken on an anon_vma when there is no
 	 * guarantee that the vma of page tables will exist for
 	 * the duration of the operation. A caller that takes
 	 * the reference is responsible for clearing up the
 	 * anon_vma if they are the last user on release
+	 * 
+	 * 红黑树中的节点数量
+	 * 初始化时为1，也就是只有本结点，当加入root的anon_vma的红黑树时，此值不变
 	 */
 	atomic_t refcount;
 
@@ -60,11 +63,15 @@ struct anon_vma {
 	 * mm_take_all_locks() (mm_all_locks_mutex).
 	 */
 
-	/* Interval tree of private "related" vmas */
-	struct rb_root_cached rb_root;
+	/** Interval tree of private "related" vmas
+	 * 用于管理anon_vma关联的所有anon_vma_chain结构体
+	 * anon_vma_chain结构体关联到vm_area_struct
+	 * 原因: 一个匿名物理页可以映射到多个vm_area_struct
+	 */
+	struct rb_root_cached rb_root; 
 };
 
-/*
+/* anno_vma(匿名物理页) 与 vm_area_struct 的连接桥梁
  * The copy-on-write semantics of fork mean that an anon_vma
  * can become associated with multiple processes. Furthermore,
  * each child process will have its own anon_vma, where new
@@ -78,10 +85,19 @@ struct anon_vma {
  * which link all the VMAs associated with this anon_vma.
  */
 struct anon_vma_chain {
-	struct vm_area_struct *vma;
-	struct anon_vma *anon_vma;
-	struct list_head same_vma;   /* locked by mmap_lock & page_table_lock */
-	struct rb_node rb;			/* locked by anon_vma->rwsem */
+	struct vm_area_struct *vma; // 匿名页关联的进程虚拟内存空间
+	struct anon_vma *anon_vma; // 此结构加入的红黑树所属的anon_vma
+
+	/** locked by mmap_lock & page_table_lock
+	 * 一个vm_area_struct可以拥有多个进程的匿名物理页
+	 * 用于加入所属vma的anon_vma_chain链表中
+	 */
+	struct list_head same_vma;
+
+	/** locked by anon_vma->rwsem
+	 * 用于加入其他进程或者本进程vma的anon_vma的红黑树中
+	 */
+	struct rb_node rb;			
 	unsigned long rb_subtree_last;
 #ifdef CONFIG_DEBUG_VM_RB
 	unsigned long cached_vma_start, cached_vma_last;

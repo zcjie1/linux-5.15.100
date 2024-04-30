@@ -1345,6 +1345,7 @@ struct mem_section {
 #define NR_SECTION_ROOTS	DIV_ROUND_UP(NR_MEM_SECTIONS, SECTIONS_PER_ROOT)
 #define SECTION_ROOT_MASK	(SECTIONS_PER_ROOT - 1)
 
+/* SPARSEMEM 内存模型管理数据结构 */
 #ifdef CONFIG_SPARSEMEM_EXTREME
 extern struct mem_section **mem_section;
 #else
