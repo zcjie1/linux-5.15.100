@@ -67,8 +67,8 @@ struct memblock_region {
  */
 struct memblock_type {
 	unsigned long cnt;
-	unsigned long max;
-	phys_addr_t total_size;
+	unsigned long max; 
+	phys_addr_t total_size; 
 	struct memblock_region *regions;
 	char *name;
 };
@@ -81,9 +81,13 @@ struct memblock_type {
  * @reserved: reserved memory regions
  */
 struct memblock {
+	/**
+	 * true:从低地址(内核映像的尾部)向高地址分配
+	 * false:也就是top-down,从高地址向地址分配内存.
+	*/
 	bool bottom_up;  /* is bottom up direction? */
 	phys_addr_t current_limit;
-	struct memblock_type memory;
+	struct memblock_type memory; // 可用内存的集合
 	struct memblock_type reserved;
 };
 

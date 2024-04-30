@@ -405,6 +405,8 @@ enum node_states {
 /*
  * The following particular system nodemasks and operations
  * on them manage all possible and online nodes.
+ * 
+ * NUMA节点状态位图
  */
 
 extern nodemask_t node_states[NR_NODE_STATES];

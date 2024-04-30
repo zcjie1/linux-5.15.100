@@ -10,7 +10,7 @@
 #include <linux/mmdebug.h>
 #include <asm/smp.h>
 
-extern struct pglist_data *node_data[];
+extern struct pglist_data *node_data[]; // NUMA节点
 
 #define NODE_DATA(nid)		(node_data[nid])
 

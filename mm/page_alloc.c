@@ -8409,10 +8409,11 @@ static void setup_per_zone_lowmem_reserve(void)
 	calculate_totalreserve_pages();
 }
 
+// 通过min_free_kbytes计算水位线
 static void __setup_per_zone_wmarks(void)
 {
-	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
-	unsigned long lowmem_pages = 0;
+	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10); // 将 min_free_kbytes 转换为页
+	unsigned long lowmem_pages = 0; // 所有低位内存区域 managed_pages 之和
 	struct zone *zone;
 	unsigned long flags;
 
@@ -8422,12 +8423,13 @@ static void __setup_per_zone_wmarks(void)
 			lowmem_pages += zone_managed_pages(zone);
 	}
 
+	// 循环计算各个内存区域中的水位线
 	for_each_zone(zone) {
 		u64 tmp;
 
 		spin_lock_irqsave(&zone->lock, flags);
 		tmp = (u64)pages_min * zone_managed_pages(zone);
-		do_div(tmp, lowmem_pages);
+		do_div(tmp, lowmem_pages); // 计算 WMARK_MIN 水位线的核心方法
 		if (is_highmem(zone)) {
 			/*
 			 * __GFP_HIGH and PF_MEMALLOC allocations usually don't
@@ -8455,6 +8457,9 @@ static void __setup_per_zone_wmarks(void)
 		 * Set the kswapd watermarks distance according to the
 		 * scale factor in proportion to available memory, but
 		 * ensure a minimum size on small systems.
+		 * 
+		 * 通过watermark_scale_factor参数调节水位线
+		 * 水位线间距公式: (watermark_scale_factor / 10000) * managed_pages
 		 */
 		tmp = max_t(u64, tmp >> 2,
 			    mult_frac(zone_managed_pages(zone),
@@ -8521,10 +8526,10 @@ void setup_per_zone_wmarks(void)
  */
 int __meminit init_per_zone_wmark_min(void)
 {
-	unsigned long lowmem_kbytes;
-	int new_min_free_kbytes;
+	unsigned long lowmem_kbytes; // 低位内存区域（除高端内存之外）的总和
+	int new_min_free_kbytes; // 待计算的 min_free_kbytes
 
-	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10);
+	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10); // 获取高于高水位线的内存(KB), 此时高水位线未设置
 	new_min_free_kbytes = int_sqrt(lowmem_kbytes * 16);
 
 	if (new_min_free_kbytes > user_min_free_kbytes) {
@@ -8537,7 +8542,7 @@ int __meminit init_per_zone_wmark_min(void)
 		pr_warn("min_free_kbytes is not updated to %d because user defined value %d is preferred\n",
 				new_min_free_kbytes, user_min_free_kbytes);
 	}
-	setup_per_zone_wmarks();
+	setup_per_zone_wmarks(); // 设置水位线
 	refresh_zone_stat_thresholds();
 	setup_per_zone_lowmem_reserve();
 

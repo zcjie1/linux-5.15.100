@@ -1522,7 +1522,7 @@ static int __ref kernel_init(void *unused)
 	ftrace_free_init_mem();
 	kgdb_free_init_mem();
 	exit_boot_config();
-	free_initmem();
+	free_initmem(); // 将memblock管理的内存页free
 	mark_readonly();
 
 	/*

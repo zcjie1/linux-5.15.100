@@ -7,9 +7,9 @@
 #ifndef __ASSEMBLY__
 
 /*
- * supports 3 memory models.
+ * supports 3 memory models. DISCONTIGMEM内存模型已被移除(2021)
  */
-#if defined(CONFIG_FLATMEM)
+#if defined(CONFIG_FLATMEM) /* 平坦内存模型 */
 
 #ifndef ARCH_PFN_OFFSET
 #define ARCH_PFN_OFFSET		(0UL)
@@ -25,7 +25,7 @@
 #define __pfn_to_page(pfn)	(vmemmap + (pfn))
 #define __page_to_pfn(page)	(unsigned long)((page) - vmemmap)
 
-#elif defined(CONFIG_SPARSEMEM)
+#elif defined(CONFIG_SPARSEMEM) /* SPARSEMEM 稀疏内存模型 */
 /*
  * Note: section's mem_map is encoded to reflect its start_pfn.
  * section[i].section_mem_map == mem_map's address - start_pfn;

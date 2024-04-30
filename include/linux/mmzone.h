@@ -359,14 +359,18 @@ enum zone_watermarks {
 /* Fields and list protected by pagesets local_lock in page_alloc.c */
 struct per_cpu_pages {
 	int count;		/* number of pages in the list */
-	int high;		/* high watermark, emptying needed */
+	int high;		/* high watermark, emptying needed 高速缓存中的页面数上限*/
 	int batch;		/* chunk size for buddy add/remove */
 	short free_factor;	/* batch scaling factor during free */
 #ifdef CONFIG_NUMA
 	short expire;		/* When 0, remote pagesets are drained */
 #endif
 
-	/* Lists of pages, one per migrate type stored on the pcp-lists */
+	/**
+	 * Lists of pages, one per migrate type stored on the pcp-lists 
+	 * 每一中页面迁移类型(可迁移、可回收、不可迁移)对应一个冷热页链表
+	 * 热页放在链表头部，冷页放在链表尾部
+	*/
 	struct list_head lists[NR_PCP_LISTS];
 };
 
@@ -403,10 +407,10 @@ enum zone_type {
 	 * platforms may need both zones as they support peripherals with
 	 * different DMA addressing limitations.
 	 */
-#ifdef CONFIG_ZONE_DMA
+#ifdef CONFIG_ZONE_DMA /* 用于那些无法对全部物理内存进行寻址的硬件设备，进行 DMA 时的内存分配，如ISA的16M寻址 */
 	ZONE_DMA,
 #endif
-#ifdef CONFIG_ZONE_DMA32
+#ifdef CONFIG_ZONE_DMA32 /* 32位设备DMA寻址 */
 	ZONE_DMA32,
 #endif
 	/*
@@ -475,9 +479,9 @@ enum zone_type {
 	 * if has_unmovable_pages() states that there are no unmovable pages,
 	 * there can be false negatives).
 	 */
-	ZONE_MOVABLE,
+	ZONE_MOVABLE, /* 可迁移的页 */
 #ifdef CONFIG_ZONE_DEVICE
-	ZONE_DEVICE,
+	ZONE_DEVICE, /* 是为支持热插拔设备而分配的非易失性内存（ Non Volatile Memory ），也可用于内核崩溃时保存相关的调试信息 */
 #endif
 	__MAX_NR_ZONES
 
@@ -487,14 +491,16 @@ enum zone_type {
 
 #define ASYNC_AND_SYNC 2
 
+// 管理 NUMA 节点中的物理内存区域
+// 通过 ZONE_PADDING 将字段打散到不同的cache line，提高访问性能
 struct zone {
 	/* Read-mostly fields */
 
 	/* zone watermarks, access with *_wmark_pages(zone) macros */
-	unsigned long _watermark[NR_WMARK];
-	unsigned long watermark_boost;
+	unsigned long _watermark[NR_WMARK]; // 物理内存区域中的水位线
+	unsigned long watermark_boost; // 优化内存碎片对内存分配的影响，可以动态改变内存区域的基准水位线
 
-	unsigned long nr_reserved_highatomic;
+	unsigned long nr_reserved_highatomic; // 预留内存的大小(128K ~ 65536K)，即为Min水位线
 
 	/*
 	 * We don't know if the memory that we're going to allocate will be
@@ -505,13 +511,13 @@ struct zone {
 	 * recalculated at runtime if the sysctl_lowmem_reserve_ratio sysctl
 	 * changes.
 	 */
-	long lowmem_reserve[MAX_NR_ZONES];
+	long lowmem_reserve[MAX_NR_ZONES]; // 每个区域为自己保留的物理页数量，防止高位内存区域侵占
 
 #ifdef CONFIG_NUMA
 	int node;
 #endif
-	struct pglist_data	*zone_pgdat;
-	struct per_cpu_pages	__percpu *per_cpu_pageset;
+	struct pglist_data	*zone_pgdat; // 指向此内存区域属于的NUMA节点
+	struct per_cpu_pages	__percpu *per_cpu_pageset; // 用于管理CPU冷热页
 	struct per_cpu_zonestat	__percpu *per_cpu_zonestats;
 	/*
 	 * the high and batch values are copied to individual pagesets for
@@ -529,7 +535,7 @@ struct zone {
 #endif /* CONFIG_SPARSEMEM */
 
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
-	unsigned long		zone_start_pfn;
+	unsigned long		zone_start_pfn; // 属于该内存区域中的第一个物理页 PFN
 
 	/*
 	 * spanned_pages is the total pages spanned by the zone, including
@@ -573,9 +579,9 @@ struct zone {
 	 * mem_hotplug_begin/end(). Any reader who can't tolerant drift of
 	 * present_pages should get_online_mems() to get a stable value.
 	 */
-	atomic_long_t		managed_pages;
-	unsigned long		spanned_pages;
-	unsigned long		present_pages;
+	atomic_long_t		managed_pages; // 被伙伴系统所管理的物理页数
+	unsigned long		spanned_pages; // 该内存区域中所有的物理页个数（包含内存空洞）
+	unsigned long		present_pages; // 该内存区域所有可用的物理页个数（不包含内存空洞）
 #if defined(CONFIG_MEMORY_HOTPLUG)
 	unsigned long		present_early_pages;
 #endif
@@ -583,7 +589,7 @@ struct zone {
 	unsigned long		cma_pages;
 #endif
 
-	const char		*name;
+	const char		*name; // 内存区域名称
 
 #ifdef CONFIG_MEMORY_ISOLATION
 	/*
@@ -605,12 +611,12 @@ struct zone {
 	ZONE_PADDING(_pad1_)
 
 	/* free areas of different sizes */
-	struct free_area	free_area[MAX_ORDER];
+	struct free_area	free_area[MAX_ORDER]; // 伙伴系统的核心数据结构
 
 	/* zone flags, see below */
 	unsigned long		flags;
 
-	/* Primarily protects free_area */
+	/* Primarily protects free_area 防止并发访问*/
 	spinlock_t		lock;
 
 	/* Write-intensive fields used by compaction and vmstats. */
@@ -653,7 +659,7 @@ struct zone {
 
 	ZONE_PADDING(_pad3_)
 	/* Zone statistics */
-	atomic_long_t		vm_stat[NR_VM_ZONE_STAT_ITEMS];
+	atomic_long_t		vm_stat[NR_VM_ZONE_STAT_ITEMS]; // 该内存区域内存使用的统计信息
 	atomic_long_t		vm_numa_event[NR_VM_NUMA_EVENT_ITEMS];
 } ____cacheline_internodealigned_in_smp;
 
@@ -803,16 +809,16 @@ typedef struct pglist_data {
 	 * zones may be populated, but it is the full list. It is referenced by
 	 * this node's node_zonelists as well as other node's node_zonelists.
 	 */
-	struct zone node_zones[MAX_NR_ZONES];
+	struct zone node_zones[MAX_NR_ZONES]; // NUMA 节点中的物理内存区域
 
 	/*
 	 * node_zonelists contains references to all zones in all nodes.
 	 * Generally the first zones will be references to this node's
 	 * node_zones.
 	 */
-	struct zonelist node_zonelists[MAX_ZONELISTS];
+	struct zonelist node_zonelists[MAX_ZONELISTS]; // NUMA 节点的备用列表
 
-	int nr_zones; /* number of populated zones in this node */
+	int nr_zones; /* number of populated zones in this node——NUMA节点中的物理内存区域个数*/
 #ifdef CONFIG_FLATMEM	/* means !SPARSEMEM */
 	struct page *node_mem_map;
 #ifdef CONFIG_PAGE_EXTENSION
@@ -1258,9 +1264,10 @@ static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
 #error Allocator MAX_ORDER exceeds SECTION_SIZE
 #endif
 
+// 得出pfn对应第几个section
 static inline unsigned long pfn_to_section_nr(unsigned long pfn)
 {
-	return pfn >> PFN_SECTION_SHIFT;
+	return pfn >> PFN_SECTION_SHIFT; // section = 128M; page = 4K
 }
 static inline unsigned long section_nr_to_pfn(unsigned long sec)
 {
@@ -1311,7 +1318,7 @@ struct mem_section {
 	 * Making it a UL at least makes someone do a cast
 	 * before using it wrong.
 	 */
-	unsigned long section_mem_map;
+	unsigned long section_mem_map; // 指向section管理的连续内存page数组
 
 	struct mem_section_usage *usage;
 #ifdef CONFIG_PAGE_EXTENSION
@@ -1351,9 +1358,9 @@ static inline unsigned long *section_to_usemap(struct mem_section *ms)
 
 static inline struct mem_section *__nr_to_section(unsigned long nr)
 {
-	unsigned long root = SECTION_NR_TO_ROOT(nr);
+	unsigned long root = SECTION_NR_TO_ROOT(nr); // 得出nr对应的section在第几页
 
-	if (unlikely(root >= NR_SECTION_ROOTS))
+	if (unlikely(root >= NR_SECTION_ROOTS)) // 若root大于最大页数
 		return NULL;
 
 #ifdef CONFIG_SPARSEMEM_EXTREME
@@ -1386,6 +1393,7 @@ extern size_t mem_section_usage_size(void);
 #define SECTION_MAP_MASK		(~(SECTION_MAP_LAST_BIT-1))
 #define SECTION_NID_SHIFT		6
 
+// 返回section对应的page数组首地址
 static inline struct page *__section_mem_map_addr(struct mem_section *section)
 {
 	unsigned long map = section->section_mem_map;
