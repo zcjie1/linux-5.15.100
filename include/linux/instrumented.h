@@ -13,7 +13,7 @@
 #include <linux/types.h>
 
 /**
- * instrument_read - instrument regular read access
+ * instrument_read - instrument regular read access kcsan内存检查
  *
  * Instrument a regular read access. The instrumentation should be inserted
  * before the actual read happens.
@@ -28,7 +28,7 @@ static __always_inline void instrument_read(const volatile void *v, size_t size)
 }
 
 /**
- * instrument_write - instrument regular write access
+ * instrument_write - instrument regular write access kcsan内存检查
  *
  * Instrument a regular write access. The instrumentation should be inserted
  * before the actual write happens.
@@ -43,7 +43,7 @@ static __always_inline void instrument_write(const volatile void *v, size_t size
 }
 
 /**
- * instrument_read_write - instrument regular read-write access
+ * instrument_read_write - instrument regular read-write access kcsan内存检查
  *
  * Instrument a regular write access. The instrumentation should be inserted
  * before the actual write happens.
@@ -58,7 +58,9 @@ static __always_inline void instrument_read_write(const volatile void *v, size_t
 }
 
 /**
- * instrument_atomic_read - instrument atomic read access
+ * instrument_atomic_read - instrument atomic read access 
+ * 
+ * kcsan内存检查
  *
  * Instrument an atomic read access. The instrumentation should be inserted
  * before the actual read happens.
@@ -73,7 +75,7 @@ static __always_inline void instrument_atomic_read(const volatile void *v, size_
 }
 
 /**
- * instrument_atomic_write - instrument atomic write access
+ * instrument_atomic_write - instrument atomic write access kcsan内存检查
  *
  * Instrument an atomic write access. The instrumentation should be inserted
  * before the actual write happens.
@@ -88,7 +90,7 @@ static __always_inline void instrument_atomic_write(const volatile void *v, size
 }
 
 /**
- * instrument_atomic_read_write - instrument atomic read-write access
+ * instrument_atomic_read_write - instrument atomic read-write access kcsan内存检查
  *
  * Instrument an atomic read-write access. The instrumentation should be
  * inserted before the actual write happens.
@@ -103,7 +105,7 @@ static __always_inline void instrument_atomic_read_write(const volatile void *v,
 }
 
 /**
- * instrument_copy_to_user - instrument reads of copy_to_user
+ * instrument_copy_to_user - instrument reads of copy_to_user kcsan内存检查
  *
  * Instrument reads from kernel memory, that are due to copy_to_user (and
  * variants). The instrumentation must be inserted before the accesses.
@@ -120,7 +122,7 @@ instrument_copy_to_user(void __user *to, const void *from, unsigned long n)
 }
 
 /**
- * instrument_copy_from_user - instrument writes of copy_from_user
+ * instrument_copy_from_user - instrument writes of copy_from_user kcsan内存检查
  *
  * Instrument writes to kernel memory, that are due to copy_from_user (and
  * variants). The instrumentation should be inserted before the accesses.

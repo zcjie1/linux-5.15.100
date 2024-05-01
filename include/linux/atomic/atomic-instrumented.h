@@ -21,6 +21,7 @@
 #include <linux/compiler.h>
 #include <linux/instrumented.h>
 
+// 原子读
 static __always_inline int
 atomic_read(const atomic_t *v)
 {
@@ -28,6 +29,7 @@ atomic_read(const atomic_t *v)
 	return arch_atomic_read(v);
 }
 
+// 原子读 + 内存屏障
 static __always_inline int
 atomic_read_acquire(const atomic_t *v)
 {
@@ -35,6 +37,7 @@ atomic_read_acquire(const atomic_t *v)
 	return arch_atomic_read_acquire(v);
 }
 
+// 原子设置初值
 static __always_inline void
 atomic_set(atomic_t *v, int i)
 {
@@ -42,6 +45,7 @@ atomic_set(atomic_t *v, int i)
 	arch_atomic_set(v, i);
 }
 
+// 原子写 + 内存屏障
 static __always_inline void
 atomic_set_release(atomic_t *v, int i)
 {
@@ -49,6 +53,7 @@ atomic_set_release(atomic_t *v, int i)
 	arch_atomic_set_release(v, i);
 }
 
+// 原子加
 static __always_inline void
 atomic_add(int i, atomic_t *v)
 {
@@ -56,6 +61,7 @@ atomic_add(int i, atomic_t *v)
 	arch_atomic_add(i, v);
 }
 
+// 原子加 + 返回新值
 static __always_inline int
 atomic_add_return(int i, atomic_t *v)
 {
@@ -63,6 +69,7 @@ atomic_add_return(int i, atomic_t *v)
 	return arch_atomic_add_return(i, v);
 }
 
+// 原子加 + 返回新值 + 读内存屏障
 static __always_inline int
 atomic_add_return_acquire(int i, atomic_t *v)
 {
@@ -70,6 +77,7 @@ atomic_add_return_acquire(int i, atomic_t *v)
 	return arch_atomic_add_return_acquire(i, v);
 }
 
+// 原子加 + 返回新值 + 写内存屏障
 static __always_inline int
 atomic_add_return_release(int i, atomic_t *v)
 {
@@ -84,6 +92,7 @@ atomic_add_return_relaxed(int i, atomic_t *v)
 	return arch_atomic_add_return_relaxed(i, v);
 }
 
+// 原子加 + 返回旧值
 static __always_inline int
 atomic_fetch_add(int i, atomic_t *v)
 {
