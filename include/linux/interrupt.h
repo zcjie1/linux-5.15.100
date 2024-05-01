@@ -590,11 +590,11 @@ struct tasklet_struct
 {
 	struct tasklet_struct *next;
 	unsigned long state;
-	atomic_t count;
-	bool use_callback;
+	atomic_t count;	// 引用计数，为0表示可调度
+	bool use_callback; // 任务处理函数的类型
 	union {
-		void (*func)(unsigned long data);
-		void (*callback)(struct tasklet_struct *t);
+		void (*func)(unsigned long data); // 旧格式tasklet任务处理函数
+		void (*callback)(struct tasklet_struct *t); // 新格式tasklet任务处理函数
 	};
 	unsigned long data;
 };
