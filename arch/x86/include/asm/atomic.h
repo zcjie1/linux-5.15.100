@@ -191,6 +191,7 @@ static __always_inline int arch_atomic_fetch_sub(int i, atomic_t *v)
 }
 #define arch_atomic_fetch_sub arch_atomic_fetch_sub
 
+// 若v中的值与old值相等, 则将new值赋给v
 static __always_inline int arch_atomic_cmpxchg(atomic_t *v, int old, int new)
 {
 	return arch_cmpxchg(&v->counter, old, new);
