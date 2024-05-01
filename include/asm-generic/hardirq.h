@@ -6,12 +6,13 @@
 #include <linux/threads.h>
 
 typedef struct {
-	unsigned int __softirq_pending;
+	unsigned int __softirq_pending; //软中断标志位
 #ifdef ARCH_WANTS_NMI_IRQSTAT
-	unsigned int __nmi_count;
+	unsigned int __nmi_count; // IPI中断标志位
 #endif
 } ____cacheline_aligned irq_cpustat_t;
 
+// 等效于 irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned
 DECLARE_PER_CPU_ALIGNED(irq_cpustat_t, irq_stat);
 
 #include <linux/irq.h>

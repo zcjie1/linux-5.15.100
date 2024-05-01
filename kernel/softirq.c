@@ -699,6 +699,7 @@ void __raise_softirq_irqoff(unsigned int nr)
 	or_softirq_pending(1UL << nr); // 设置软中断对应标志位
 }
 
+// 注册软中断及其处理函数
 void open_softirq(int nr, void (*action)(struct softirq_action *))
 {
 	softirq_vec[nr].action = action;
