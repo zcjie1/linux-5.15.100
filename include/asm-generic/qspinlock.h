@@ -79,10 +79,11 @@ static __always_inline void queued_spin_lock(struct qspinlock *lock)
 {
 	int val = 0;
 
+	// 无竞争，(0,0,0) --> (0,0,1) 
 	if (likely(atomic_try_cmpxchg_acquire(&lock->val, &val, _Q_LOCKED_VAL)))
 		return;
 
-	queued_spin_lock_slowpath(lock, val);
+	queued_spin_lock_slowpath(lock, val); // 单个进程不会同时竞争多个spinlock，可以共用qnode
 }
 #endif
 

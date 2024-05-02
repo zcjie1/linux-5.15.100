@@ -11,6 +11,15 @@
 
 #include <linux/types.h>
 
+/**
+ * qspinlock = 32位宽
+ * 
+ * 00 ~ 07: locked byte —— 标识是否持有锁(0 or 1)
+ *      08: pending —— 是否有CPU在等待
+ * 09 ~ 15: not used
+ * 16 ~ 17: tail index —— 对应四种context上下文(task, softirq, hardirq, nmi)
+ * 18 ~ 31: tail cpu (+1) —— 队尾MCS node对应的CPU号
+*/
 typedef struct qspinlock {
 	union {
 		atomic_t val;

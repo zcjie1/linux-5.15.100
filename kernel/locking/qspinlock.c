@@ -104,6 +104,15 @@ struct qnode {
  * Exactly fits one 64-byte cacheline on a 64-bit architecture.
  *
  * PV doubles the storage and uses the second cacheline for PV state.
+ * 
+ * struct qnode {
+ *		struct mcs_spinlock mcs;
+ *	#ifdef CONFIG_PARAVIRT_SPINLOCKS
+ *		long reserved[2];
+ *	#endif
+ *	};
+ * 
+ * 队尾MCS node
  */
 static DEFINE_PER_CPU_ALIGNED(struct qnode, qnodes[MAX_NODES]);
 
@@ -331,15 +340,19 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 	 * number of spins so that we guarantee forward progress.
 	 *
 	 * 0,1,0 -> 0,0,1
+	 * (0,1,0)是spinlock移交的过渡状态
 	 */
-	if (val == _Q_PENDING_VAL) {
+	if (val == _Q_PENDING_VAL) { // 若Pending置位，即已有CPU在等待，当前为第三CPU
 		int cnt = _Q_PENDING_LOOPS;
+
+		// 循环读取直到 pending复位 或 cnt为0
 		val = atomic_cond_read_relaxed(&lock->val,
 					       (VAL != _Q_PENDING_VAL) || !cnt--);
 	}
 
 	/*
 	 * If we observe any contention; queue.
+	 * 若当前为第三个及以上CPU试图获取锁，则加入到mcs队列
 	 */
 	if (val & ~_Q_LOCKED_MASK)
 		goto queue;
@@ -348,6 +361,8 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 	 * trylock || pending
 	 *
 	 * 0,0,* -> 0,1,* -> 0,0,1 pending, trylock
+	 * 
+	 * 当前为第二个CPU试图获取锁，置位pending位
 	 */
 	val = queued_fetch_set_pending_acquire(lock);
 
@@ -377,6 +392,8 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 	 * sequentiality; this is because not all
 	 * clear_pending_set_locked() implementations imply full
 	 * barriers.
+	 * 
+	 * 等待第一个CPU移交
 	 */
 	if (val & _Q_LOCKED_MASK)
 		atomic_cond_read_acquire(&lock->val, !(VAL & _Q_LOCKED_MASK));
@@ -385,6 +402,8 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 	 * take ownership and clear the pending bit.
 	 *
 	 * 0,1,0 -> 0,0,1
+	 * 
+	 * 第二个CPU成功获取spinlock (0,1,0) --> (0,0,1)
 	 */
 	clear_pending_set_locked(lock);
 	lockevent_inc(lock_pending);
@@ -457,21 +476,23 @@ pv_queue:
 	 *
 	 * p,*,* -> n,*,*
 	 */
-	old = xchg_tail(lock, tail);
+	old = xchg_tail(lock, tail); // 更新lock的tail值，并返回旧值
 	next = NULL;
 
 	/*
 	 * if there was a previous node; link it and wait until reaching the
 	 * head of the waitqueue.
+	 * 
+	 * 如果MCS node队列不为空 - 第N个CPU
 	 */
 	if (old & _Q_TAIL_MASK) {
-		prev = decode_tail(old);
+		prev = decode_tail(old); // 解析tail值，获取上一个MCS node
 
 		/* Link @node into the waitqueue. */
-		WRITE_ONCE(prev->next, node);
+		WRITE_ONCE(prev->next, node); // 让上一个node指向自己，加入等待队列
 
 		pv_wait_node(node, prev);
-		arch_mcs_spin_lock_contended(&node->locked);
+		arch_mcs_spin_lock_contended(&node->locked); // 基于自己的locked值进行spin
 
 		/*
 		 * While waiting for the MCS lock, the next pointer may have
@@ -508,6 +529,7 @@ pv_queue:
 	if ((val = pv_wait_head_or_lock(lock, node)))
 		goto locked;
 
+	// 等到第二CPU释放了spinlock，"locked byte"和"pending"都为0时，才直接获取spinlock
 	val = atomic_cond_read_acquire(&lock->val, !(VAL & _Q_LOCKED_PENDING_MASK));
 
 locked:
@@ -532,7 +554,7 @@ locked:
 	 *       above wait condition, therefore any concurrent setting of
 	 *       PENDING will make the uncontended transition fail.
 	 */
-	if ((val & _Q_TAIL_MASK) == tail) {
+	if ((val & _Q_TAIL_MASK) == tail) { // 当前MCS node队列中仅有一个node
 		if (atomic_try_cmpxchg_relaxed(&lock->val, &val, _Q_LOCKED_VAL))
 			goto release; /* No contention */
 	}
@@ -541,6 +563,8 @@ locked:
 	 * Either somebody is queued behind us or _Q_PENDING_VAL got set
 	 * which will then detect the remaining tail and queue behind us
 	 * ensuring we'll see a @next.
+	 * 
+	 * 如果MSC node队列中还有其他node (n,0,0) --> (n,0,1)
 	 */
 	set_locked(lock);
 
@@ -550,7 +574,7 @@ locked:
 	if (!next)
 		next = smp_cond_load_relaxed(&node->next, (VAL));
 
-	arch_mcs_spin_unlock_contended(&next->locked);
+	arch_mcs_spin_unlock_contended(&next->locked); //设置下一个node的"locked"为1
 	pv_kick_node(lock, next);
 
 release:
