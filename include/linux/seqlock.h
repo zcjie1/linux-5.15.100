@@ -801,6 +801,9 @@ typedef struct {
 	/*
 	 * Make sure that readers don't starve writers on PREEMPT_RT: use
 	 * seqcount_spinlock_t instead of seqcount_t. Check __SEQ_LOCK().
+	 * 
+	 * 每当有writter获得或释放seqlock，sequence number的值就会加1
+	 * seqcount的初值为偶数
 	 */
 	seqcount_spinlock_t seqcount;
 	spinlock_t lock;
