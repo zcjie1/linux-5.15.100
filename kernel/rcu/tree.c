@@ -3705,6 +3705,8 @@ static int rcu_blocking_is_gp(void)
 
 /**
  * synchronize_rcu - wait until a grace period has elapsed.
+ * 
+ * 等待所有旧节点reader离开临界区，等效于call_rcu(注册回调函数，无需等待)
  *
  * Control will return to the caller some time after a full grace
  * period has elapsed, in other words after all currently executing RCU

@@ -421,6 +421,9 @@ static inline void rcu_preempt_sleep_check(void) { }
 
 /**
  * rcu_assign_pointer() - assign to RCU-protected pointer
+ * 
+ * 更新RCU链表节点的指针
+ * 
  * @p: pointer to assign to
  * @v: value to assign (publish)
  *
@@ -598,6 +601,10 @@ do {									      \
 
 /**
  * rcu_dereference() - fetch RCU-protected pointer for dereferencing
+ * 
+ * 获取当前链表的节点的next指针，并赋给临时变量
+ * 因为wirter会poison节点的next指针
+ * 
  * @p: The pointer to read, prior to dereferencing
  *
  * This is a simple wrapper around rcu_dereference_check().
@@ -644,6 +651,8 @@ do {									      \
 
 /**
  * rcu_read_lock() - mark the beginning of an RCU read-side critical section
+ * 
+ * RCU读者上锁 = 禁止调度
  *
  * When synchronize_rcu() is invoked on one CPU while other CPUs
  * are within RCU read-side critical sections, then the
@@ -710,7 +719,9 @@ static __always_inline void rcu_read_lock(void)
 
 /**
  * rcu_read_unlock() - marks the end of an RCU read-side critical section.
- *
+ * 
+ * RCU读者解锁 —— 开启调度
+ * 
  * In almost all situations, rcu_read_unlock() is immune from deadlock.
  * In recent kernels that have consolidated synchronize_sched() and
  * synchronize_rcu_bh() into synchronize_rcu(), this deadlock immunity
