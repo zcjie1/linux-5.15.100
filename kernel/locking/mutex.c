@@ -61,6 +61,11 @@ EXPORT_SYMBOL(__mutex_init);
  * Bit0 indicates a non-empty waiter list; unlock must issue a wakeup.
  * Bit1 indicates unlock needs to hand the lock to the top-waiter
  * Bit2 indicates handoff has been done and we're waiting for pickup.
+ * 
+ * owner低位3bit 标志位
+ * bit0 -- MUTEX_FLAG_WAITERS：指示当前是否有睡眠的等待者
+ * bit1 -- MUTEX_FLAG_HANDOFF：指示下一次解锁需要将锁指定交给某个进程
+ * bit2 -- MUTEX_FLAG_PICKUP：和 bit1 配合，指定交给某个进程之后需要进程确认的标志位
  */
 #define MUTEX_FLAG_WAITERS	0x01
 #define MUTEX_FLAG_HANDOFF	0x02
@@ -387,7 +392,7 @@ static inline int mutex_can_spin_on_owner(struct mutex *lock)
 	struct task_struct *owner;
 	int retval = 1;
 
-	if (need_resched())
+	if (need_resched()) // 若有更高优先级的线程，直接调度
 		return 0;
 
 	rcu_read_lock();
@@ -397,7 +402,7 @@ static inline int mutex_can_spin_on_owner(struct mutex *lock)
 	 * As lock holder preemption issue, we both skip spinning if task is not
 	 * on cpu or its cpu is preempted
 	 */
-	if (owner)
+	if (owner) // on_cpu为0说明前一个持有锁的线程被抢占
 		retval = owner->on_cpu && !vcpu_is_preempted(task_cpu(owner));
 	rcu_read_unlock();
 
@@ -596,7 +601,7 @@ __mutex_lock_common(struct mutex *lock, unsigned int state, unsigned int subclas
 	mutex_acquire_nest(&lock->dep_map, subclass, 0, nest_lock, ip);
 
 	if (__mutex_trylock(lock) ||
-	    mutex_optimistic_spin(lock, ww_ctx, NULL)) {
+	    mutex_optimistic_spin(lock, ww_ctx, NULL)) { // spin一会，做最后的尝试，试图获得互斥锁
 		/* got the lock, yay! */
 		lock_acquired(&lock->dep_map, ip);
 		if (ww_ctx)
@@ -675,6 +680,9 @@ __mutex_lock_common(struct mutex *lock, unsigned int state, unsigned int subclas
 		 * Here we order against unlock; we must either see it change
 		 * state back to RUNNING and fall through the next schedule(),
 		 * or we must see its unlock and acquire.
+		 * 
+		 * __mutex_trylock_or_handoff函数
+		 * 首先尝试获取锁，失败则设置 MUTEX_FLAG_HANDOFF 标志，表示当前锁持有者释放锁时指定交给当前进程
 		 */
 		if (__mutex_trylock_or_handoff(lock, first) ||
 		    (first && mutex_optimistic_spin(lock, ww_ctx, &waiter)))
@@ -922,9 +930,11 @@ int __sched mutex_lock_interruptible(struct mutex *lock)
 {
 	might_sleep();
 
+	/* fast path */
 	if (__mutex_trylock_fast(lock))
 		return 0;
 
+	/* slow path */
 	return __mutex_lock_interruptible_slowpath(lock);
 }
 

@@ -172,6 +172,7 @@ extern void __cant_migrate(const char *file, int line);
 				   int preempt_offset) { }
   static inline void __might_sleep(const char *file, int line,
 				   int preempt_offset) { }
+/* 什么都不做，仅仅是对开发者的提醒 */
 # define might_sleep() do { might_resched(); } while (0)
 # define cant_sleep() do { } while (0)
 # define cant_migrate()		do { } while (0)

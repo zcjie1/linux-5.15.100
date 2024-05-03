@@ -33,7 +33,7 @@
 #ifndef CONFIG_PREEMPT_RT
 
 /*
- * Simple, straightforward mutexes with strict semantics:
+ * Simple, straightforward mutexes with strict semantics: 互斥锁
  *
  * - only one task can hold the mutex at a time
  * - only the owner can unlock the mutex
@@ -61,12 +61,18 @@
  *   locks and tasks (and only those tasks)
  */
 struct mutex {
+	/**
+	 * 无线程持有此锁时，owner = 0
+	 * 有线程持有此锁时，owner = 当前线程task_struct
+	 * 由于"task_struct"指针是按"L1_CACHE_BYTES"的字节数对齐
+	 * owner的低位3bit用于存储其他信息
+	*/
 	atomic_long_t		owner;
-	raw_spinlock_t		wait_lock;
+	raw_spinlock_t		wait_lock; // spinlock
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
 	struct optimistic_spin_queue osq; /* Spinner MCS lock */
 #endif
-	struct list_head	wait_list;
+	struct list_head	wait_list; // 等待队列
 #ifdef CONFIG_DEBUG_MUTEXES
 	void			*magic;
 #endif
