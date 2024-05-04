@@ -63,9 +63,9 @@ EXPORT_SYMBOL(__mutex_init);
  * Bit2 indicates handoff has been done and we're waiting for pickup.
  * 
  * owner低位3bit 标志位
- * bit0 -- MUTEX_FLAG_WAITERS：指示当前是否有睡眠的等待者
- * bit1 -- MUTEX_FLAG_HANDOFF：指示下一次解锁需要将锁指定交给某个进程
- * bit2 -- MUTEX_FLAG_PICKUP：和 bit1 配合，指定交给某个进程之后需要进程确认的标志位
+ * bit0 -- MUTEX_FLAG_WAITERS: 指示当前是否有睡眠的等待者，若有，解锁时需要唤醒
+ * bit1 -- MUTEX_FLAG_HANDOFF: 表明解锁时需要将锁传递给顶部的等待者
+ * bit2 -- MUTEX_FLAG_PICKUP: 表明锁的交接准备已经做完，可以被取走
  */
 #define MUTEX_FLAG_WAITERS	0x01
 #define MUTEX_FLAG_HANDOFF	0x02
@@ -101,32 +101,35 @@ static inline unsigned long __owner_flags(unsigned long owner)
 
 static inline struct task_struct *__mutex_trylock_common(struct mutex *lock, bool handoff)
 {
+	// 获取当前的 task_struct 结构
 	unsigned long owner, curr = (unsigned long)current;
 
+	// 获取 lock 中的 owner，owner 由 task_struct 和低三位的标志位组成
 	owner = atomic_long_read(&lock->owner);
 	for (;;) { /* must loop, can race against a flag */
 		unsigned long flags = __owner_flags(owner);
-		unsigned long task = owner & ~MUTEX_FLAGS;
+		unsigned long task = owner & ~MUTEX_FLAGS; // 获取当前占用锁的进程
 
-		if (task) {
-			if (flags & MUTEX_FLAG_PICKUP) {
-				if (task != curr)
+		if (task) { // 若当前有进程持有锁
+			if (flags & MUTEX_FLAG_PICKUP) { // 若锁可以被取走了
+				if (task != curr) // 若持有锁的进程不是当前进程，break
 					break;
-				flags &= ~MUTEX_FLAG_PICKUP;
-			} else if (handoff) {
-				if (flags & MUTEX_FLAG_HANDOFF)
+				flags &= ~MUTEX_FLAG_PICKUP; // 若持有锁的进程是当前进程，复位pickup
+			} else if (handoff) { // 若当前try lock的进程为等待队列首位
+				if (flags & MUTEX_FLAG_HANDOFF) // 若锁持有者准备将锁转让给等待队列首位，break
 					break;
-				flags |= MUTEX_FLAG_HANDOFF;
-			} else {
+				flags |= MUTEX_FLAG_HANDOFF; // 否则，置位handoff，下文尝试获取锁时，将更新的flag赋给当前锁持有者
+			} else { // 若锁未能被取走，break
 				break;
 			}
-		} else {
+		} else { // 若无进程持有锁，设置task为当前进程
 			MUTEX_WARN_ON(flags & (MUTEX_FLAG_HANDOFF | MUTEX_FLAG_PICKUP));
 			task = curr;
 		}
 
+		// 用task尝试获取锁，task试图成为锁持有者
 		if (atomic_long_try_cmpxchg_acquire(&lock->owner, &owner, task | flags)) {
-			if (task == curr)
+			if (task == curr) // 获取锁成功
 				return NULL;
 			break;
 		}
@@ -173,6 +176,10 @@ static __always_inline bool __mutex_trylock_fast(struct mutex *lock)
 	return false;
 }
 
+/**
+ * 若当前没有线程在等待此互斥锁
+ * 则将owner复位
+*/
 static __always_inline bool __mutex_unlock_fast(struct mutex *lock)
 {
 	unsigned long curr = (unsigned long)current;
@@ -447,13 +454,16 @@ mutex_optimistic_spin(struct mutex *lock, struct ww_acquire_ctx *ww_ctx,
 		 * is not going to take OSQ lock anyway, there is no need
 		 * to call mutex_can_spin_on_owner().
 		 */
-		if (!mutex_can_spin_on_owner(lock))
+		if (!mutex_can_spin_on_owner(lock)) // 检查是否可以spin
 			goto fail;
 
 		/*
 		 * In order to avoid a stampede of mutex spinners trying to
 		 * acquire the mutex all at once, the spinners need to take a
 		 * MCS (queued) lock first before spinning on the owner field.
+		 * 
+		 * 尝试获取osq_lock，用于限制正在spin的线程
+		 * 只有获取了osq_Lock，才可以spin
 		 */
 		if (!osq_lock(&lock->osq))
 			goto fail;
@@ -523,6 +533,9 @@ static noinline void __sched __mutex_unlock_slowpath(struct mutex *lock, unsigne
 
 /**
  * mutex_unlock - release the mutex
+ * 
+ * mutex解锁
+ * 
  * @lock: the mutex to be released
  *
  * Unlock a mutex that has been locked by this task previously.
@@ -673,7 +686,7 @@ __mutex_lock_common(struct mutex *lock, unsigned int state, unsigned int subclas
 		raw_spin_unlock(&lock->wait_lock);
 		schedule_preempt_disabled();
 
-		first = __mutex_waiter_is_first(lock, &waiter);
+		first = __mutex_waiter_is_first(lock, &waiter); // 判断当前waiter是否为等待队列首位
 
 		set_current_state(state);
 		/*
@@ -683,6 +696,7 @@ __mutex_lock_common(struct mutex *lock, unsigned int state, unsigned int subclas
 		 * 
 		 * __mutex_trylock_or_handoff函数
 		 * 首先尝试获取锁，失败则设置 MUTEX_FLAG_HANDOFF 标志，表示当前锁持有者释放锁时指定交给当前进程
+		 * 当前锁持有者释放锁时，会向当前进程发送信号
 		 */
 		if (__mutex_trylock_or_handoff(lock, first) ||
 		    (first && mutex_optimistic_spin(lock, ww_ctx, &waiter)))
@@ -847,8 +861,9 @@ EXPORT_SYMBOL_GPL(ww_mutex_lock_interruptible);
 
 #endif
 
-/*
+/**
  * Release the lock, slowpath:
+ * 若当前有线程在等待此锁，保留owner的低三位
  */
 static noinline void __sched __mutex_unlock_slowpath(struct mutex *lock, unsigned long ip)
 {
@@ -865,16 +880,17 @@ static noinline void __sched __mutex_unlock_slowpath(struct mutex *lock, unsigne
 	 * Except when HANDOFF, in that case we must not clear the owner field,
 	 * but instead set it to the top waiter.
 	 */
-	owner = atomic_long_read(&lock->owner);
+	owner = atomic_long_read(&lock->owner); // 读取旧的owner值
 	for (;;) {
 		MUTEX_WARN_ON(__owner_task(owner) != current);
 		MUTEX_WARN_ON(owner & MUTEX_FLAG_PICKUP);
 
-		if (owner & MUTEX_FLAG_HANDOFF)
+		if (owner & MUTEX_FLAG_HANDOFF) // 若指定了将锁移交给等待队列首位
 			break;
 
+		// 释放mutex，同时获取记录状态的低3个bits
 		if (atomic_long_try_cmpxchg_release(&lock->owner, &owner, __owner_flags(owner))) {
-			if (owner & MUTEX_FLAG_WAITERS)
+			if (owner & MUTEX_FLAG_WAITERS) // 若当前有睡眠的等待者
 				break;
 
 			return;
@@ -883,7 +899,7 @@ static noinline void __sched __mutex_unlock_slowpath(struct mutex *lock, unsigne
 
 	raw_spin_lock(&lock->wait_lock);
 	debug_mutex_unlock(lock);
-	if (!list_empty(&lock->wait_list)) {
+	if (!list_empty(&lock->wait_list)) { // 若等待列表不为空
 		/* get the first entry from the wait-list: */
 		struct mutex_waiter *waiter =
 			list_first_entry(&lock->wait_list,
@@ -892,11 +908,11 @@ static noinline void __sched __mutex_unlock_slowpath(struct mutex *lock, unsigne
 		next = waiter->task;
 
 		debug_mutex_wake_waiter(lock, waiter);
-		wake_q_add(&wake_q, next);
+		wake_q_add(&wake_q, next); // 将该线程加入wake_q(唤醒队列)
 	}
 
 	if (owner & MUTEX_FLAG_HANDOFF)
-		__mutex_handoff(lock, next);
+		__mutex_handoff(lock, next); // 锁转移
 
 	raw_spin_unlock(&lock->wait_lock);
 
