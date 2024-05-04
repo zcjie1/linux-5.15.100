@@ -399,11 +399,15 @@ static inline int fatal_signal_pending(struct task_struct *p)
 
 static inline int signal_pending_state(unsigned int state, struct task_struct *p)
 {
-	if (!(state & (TASK_INTERRUPTIBLE | TASK_WAKEKILL)))
+	if (!(state & (TASK_INTERRUPTIBLE | TASK_WAKEKILL))) // 若此进程不可中断且不能kill
 		return 0;
-	if (!signal_pending(p))
+	if (!signal_pending(p)) // 若此进程没有挂起的信号(包括中断信号)
 		return 0;
 
+	/**
+	 * 走到这一步说明一定有信号被挂起了
+	 * 如果TASK_INTERRUPTIBLE 或 TASK_WAKEKILL，而且有信号挂起或者收到kill信号
+	*/
 	return (state & TASK_INTERRUPTIBLE) || __fatal_signal_pending(p);
 }
 

@@ -11,11 +11,13 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 
-/* Please don't access any members of this structure directly */
+/** Please don't access any members of this structure directly
+ * 内核态信号量
+ */
 struct semaphore {
 	raw_spinlock_t		lock;
-	unsigned int		count;
-	struct list_head	wait_list;
+	unsigned int		count; // 当前可以同时位于临界区的进程数量
+	struct list_head	wait_list; // 信号量的等待进程列表
 };
 
 #define __SEMAPHORE_INITIALIZER(name, n)				\
@@ -25,9 +27,11 @@ struct semaphore {
 	.wait_list	= LIST_HEAD_INIT((name).wait_list),		\
 }
 
+// 互斥信号量初始化
 #define DEFINE_SEMAPHORE(name)	\
 	struct semaphore name = __SEMAPHORE_INITIALIZER(name, 1)
 
+// 普通信号量初始化
 static inline void sema_init(struct semaphore *sem, int val)
 {
 	static struct lock_class_key __key;

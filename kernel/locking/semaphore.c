@@ -41,6 +41,9 @@ static noinline void __up(struct semaphore *sem);
 
 /**
  * down - acquire the semaphore
+ * 
+ * 不建议使用此函数
+ * 
  * @sem: the semaphore to be acquired
  *
  * Acquires the semaphore.  If no more tasks are allowed to acquire the
@@ -55,12 +58,12 @@ void down(struct semaphore *sem)
 	unsigned long flags;
 
 	might_sleep();
-	raw_spin_lock_irqsave(&sem->lock, flags);
+	raw_spin_lock_irqsave(&sem->lock, flags); // 获取spinlock并关闭中断
 	if (likely(sem->count > 0))
 		sem->count--;
 	else
 		__down(sem);
-	raw_spin_unlock_irqrestore(&sem->lock, flags);
+	raw_spin_unlock_irqrestore(&sem->lock, flags); // 释放spinlock并开启中断
 }
 EXPORT_SYMBOL(down);
 
@@ -119,6 +122,9 @@ EXPORT_SYMBOL(down_killable);
 
 /**
  * down_trylock - try to acquire the semaphore, without waiting
+ * 
+ * 原子获取信号量，成功返回0，失败返回1 —— 与spin_trylock和mutex_trylock相反
+ * 
  * @sem: the semaphore to be acquired
  *
  * Try to acquire the semaphore atomically.  Returns 0 if the semaphore has
@@ -174,6 +180,9 @@ EXPORT_SYMBOL(down_timeout);
 
 /**
  * up - release the semaphore
+ * 
+ * 释放信号量
+ * 
  * @sem: the semaphore to release
  *
  * Release the semaphore.  Unlike mutexes, up() may be called from any
@@ -215,13 +224,13 @@ static inline int __sched __down_common(struct semaphore *sem, long state,
 	waiter.up = false;
 
 	for (;;) {
-		if (signal_pending_state(state, current))
+		if (signal_pending_state(state, current)) // 判断当前进程被中断或收到kill信号
 			goto interrupted;
 		if (unlikely(timeout <= 0))
 			goto timed_out;
 		__set_current_state(state);
-		raw_spin_unlock_irq(&sem->lock);
-		timeout = schedule_timeout(timeout);
+		raw_spin_unlock_irq(&sem->lock); // 解锁，开启调度
+		timeout = schedule_timeout(timeout); // 调度，到时自动唤醒本进程
 		raw_spin_lock_irq(&sem->lock);
 		if (waiter.up)
 			return 0;
