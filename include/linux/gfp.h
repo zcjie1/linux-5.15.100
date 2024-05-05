@@ -33,24 +33,61 @@ struct vm_area_struct;
 #define ___GFP_DMA		0x01u
 #define ___GFP_HIGHMEM		0x02u
 #define ___GFP_DMA32		0x04u
+
+// 可移动页面
 #define ___GFP_MOVABLE		0x08u
+
+// 可回收页面
 #define ___GFP_RECLAIMABLE	0x10u
+
+// 高优先级页面
 #define ___GFP_HIGH		0x20u
+
+// 允许分配页面时进行swap
 #define ___GFP_IO		0x40u
+
+// 允许内核执行底层文件系统操作
 #define ___GFP_FS		0x80u
+
+// 分配页面成功后，初始化为0
 #define ___GFP_ZERO		0x100u
+
+// 分配页面时不允许睡眠
 #define ___GFP_ATOMIC		0x200u
+
+// 分配页面时，可以直接进行页面回收
 #define ___GFP_DIRECT_RECLAIM	0x400u
+
+// 分配页面时，若水位线较低，唤醒kswap
 #define ___GFP_KSWAPD_RECLAIM	0x800u
+
 #define ___GFP_WRITE		0x1000u
+
+// 分配页面失败时，抑制错误报告
 #define ___GFP_NOWARN		0x2000u
+
+// 分配页面失败时，允许重试，若干次后停止
 #define ___GFP_RETRY_MAYFAIL	0x4000u
+
+// 分配页面失败后，重试直到成功
 #define ___GFP_NOFAIL		0x8000u
+
+// 分配页面失败后，不允许重试
 #define ___GFP_NORETRY		0x10000u
+
+// 允许从所有区域分配内存(包括紧急预留内存)
 #define ___GFP_MEMALLOC		0x20000u
+
+
 #define ___GFP_COMP		0x40000u
+
+// 明确禁止内核从紧急预留内存中获取内存，优先级高于___GFP_MEMALLOC
 #define ___GFP_NOMEMALLOC	0x80000u
+
+// 分配页面仅可在当前进程CPU所处的NUMA节点
 #define ___GFP_HARDWALL		0x100000u
+
+// 分配页面仅可在当前NUMA节点或指定的NUMA节点
 #define ___GFP_THISNODE		0x200000u
 #define ___GFP_ACCOUNT		0x400000u
 #define ___GFP_ZEROTAGS		0x800000u
@@ -241,6 +278,8 @@ struct vm_area_struct;
  */
 #define __GFP_NOWARN	((__force gfp_t)___GFP_NOWARN)
 #define __GFP_COMP	((__force gfp_t)___GFP_COMP)
+
+// 将页面数据初始化为0
 #define __GFP_ZERO	((__force gfp_t)___GFP_ZERO)
 #define __GFP_ZEROTAGS	((__force gfp_t)___GFP_ZEROTAGS)
 #define __GFP_SKIP_KASAN_POISON	((__force gfp_t)___GFP_SKIP_KASAN_POISON)
@@ -327,6 +366,8 @@ struct vm_area_struct;
 #define GFP_NOIO	(__GFP_RECLAIM)
 #define GFP_NOFS	(__GFP_RECLAIM | __GFP_IO)
 #define GFP_USER	(__GFP_RECLAIM | __GFP_IO | __GFP_FS | __GFP_HARDWALL)
+
+// 从DMA区域分配物理页
 #define GFP_DMA		__GFP_DMA
 #define GFP_DMA32	__GFP_DMA32
 #define GFP_HIGHUSER	(GFP_USER | __GFP_HIGHMEM)
@@ -473,11 +514,14 @@ static inline bool gfpflags_normal_context(const gfp_t gfp_flags)
 	| 1 << (___GFP_MOVABLE | ___GFP_DMA32 | ___GFP_DMA | ___GFP_HIGHMEM)  \
 )
 
+// 将flag转换为物理内存分配区域
 static inline enum zone_type gfp_zone(gfp_t flags)
 {
 	enum zone_type z;
-	int bit = (__force int) (flags & GFP_ZONEMASK);
+	int bit = (__force int) (flags & GFP_ZONEMASK); // 获取flags的低四位
 
+	// GFP_ZONE_TABLE >> (bit * GFP_ZONES_SHIFT) 用于获取flags在TABLE中对应哪一项
+	// 与 3 进行 & 操作，得到对应的物理内存分配区域
 	z = (GFP_ZONE_TABLE >> (bit * GFP_ZONES_SHIFT)) &
 					 ((1 << GFP_ZONES_SHIFT) - 1);
 	VM_BUG_ON((GFP_ZONE_BAD >> bit) & 1);

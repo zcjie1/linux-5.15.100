@@ -5450,18 +5450,23 @@ EXPORT_SYMBOL(__alloc_pages);
  * Common helper functions. Never use with __GFP_HIGHMEM because the returned
  * address cannot represent highmem pages. Use alloc_pages and then kmap if
  * you need to access high mem.
+ * 
+ * 返回分配页的虚拟首地址
  */
 unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order)
 {
 	struct page *page;
 
+	// 不能在高端内存中分配物理页，因为无法直接映射获取虚拟内存地址
 	page = alloc_pages(gfp_mask & ~__GFP_HIGHMEM, order);
 	if (!page)
 		return 0;
+	// 返回page对应的物理页在线性映射虚拟空间中的虚拟地址
 	return (unsigned long) page_address(page);
 }
 EXPORT_SYMBOL(__get_free_pages);
 
+// 在__get_free_page的基础上，将页面数据初始化为0
 unsigned long get_zeroed_page(gfp_t gfp_mask)
 {
 	return __get_free_pages(gfp_mask | __GFP_ZERO, 0);
@@ -5470,6 +5475,9 @@ EXPORT_SYMBOL(get_zeroed_page);
 
 /**
  * __free_pages - Free pages allocated with alloc_pages().
+ * 
+ * 通过struct page释放对应物理页
+ * 
  * @page: The page pointer returned from alloc_pages().
  * @order: The order of the allocation.
  *
@@ -5501,6 +5509,7 @@ void __free_pages(struct page *page, unsigned int order)
 }
 EXPORT_SYMBOL(__free_pages);
 
+// 通过虚拟地址释放物理页
 void free_pages(unsigned long addr, unsigned int order)
 {
 	if (addr != 0) {

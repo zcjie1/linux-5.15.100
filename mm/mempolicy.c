@@ -2152,7 +2152,10 @@ EXPORT_SYMBOL(alloc_pages_vma);
 
 /**
  * alloc_pages - Allocate pages.
- * @gfp: GFP flags.
+ * 
+ * 分配连续物理页，成功返回"首物理页"对应的struct page，失败返回NULL
+ * 
+ * @gfp: GFP flags. GFP = Get Free Pages
  * @order: Power of two of number of pages to allocate.
  *
  * Allocate 1 << @order contiguous pages.  The physical address of the
