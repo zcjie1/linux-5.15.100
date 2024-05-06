@@ -2151,7 +2151,7 @@ out:
 EXPORT_SYMBOL(alloc_pages_vma);
 
 /**
- * alloc_pages - Allocate pages.
+ * alloc_pages - NUMA Allocate pages.
  * 
  * 分配连续物理页，成功返回"首物理页"对应的struct page，失败返回NULL
  * 
@@ -2172,8 +2172,8 @@ struct page *alloc_pages(gfp_t gfp, unsigned order)
 	struct mempolicy *pol = &default_policy;
 	struct page *page;
 
-	if (!in_interrupt() && !(gfp & __GFP_THISNODE))
-		pol = get_task_policy(current);
+	if (!in_interrupt() && !(gfp & __GFP_THISNODE)) // 若不处在中断状态 并且 没有要求在当前节点分配
+		pol = get_task_policy(current); // 获取当前进程的mempolicy
 
 	/*
 	 * No reference counting needed for current->mempolicy

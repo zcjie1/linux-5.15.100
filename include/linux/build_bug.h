@@ -26,8 +26,12 @@
  * BUILD_BUG_ON_INVALID() permits the compiler to check the validity of the
  * expression but avoids the generation of any code, even if that expression
  * has side-effects.
+ * 
+ * 将结构体强制转换为long是不允许的
  */
 #define BUILD_BUG_ON_INVALID(e) ((void)(sizeof((__force long)(e))))
+// #define BUILD_BUG_ON_INVALID(e) 
+// define BUILD_BUG_ON_INVALID(e) do { (void)(cond); } while (0)
 
 /**
  * BUILD_BUG_ON_MSG - break compile if a condition is true & emit supplied

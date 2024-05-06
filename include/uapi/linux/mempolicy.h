@@ -17,11 +17,22 @@
 
 /* Policies */
 enum {
+	// 当前节点分配
 	MPOL_DEFAULT,
+
+	// 从preferred节点分配内存，如果分配不到再选择其他node
 	MPOL_PREFERRED,
+
+	// 从绑定的一个或多个几点分配
 	MPOL_BIND,
+
+	// 在所有可满足需求的节点上交叉分配上分配内存
 	MPOL_INTERLEAVE,
+
+	// 从本地节点上分配内存
 	MPOL_LOCAL,
+
+	// 在prefer的多个节点上分配内存
 	MPOL_PREFERRED_MANY,
 	MPOL_MAX,	/* always last member of enum */
 };
