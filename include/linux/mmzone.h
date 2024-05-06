@@ -500,7 +500,7 @@ struct zone {
 	unsigned long _watermark[NR_WMARK]; // 物理内存区域中的水位线
 	unsigned long watermark_boost; // 优化内存碎片对内存分配的影响，可以动态改变内存区域的基准水位线
 
-	unsigned long nr_reserved_highatomic; // 预留内存的大小(128K ~ 65536K)，即为Min水位线
+	unsigned long nr_reserved_highatomic; // 预留内存的大小(128K ~ 65536K)
 
 	/*
 	 * We don't know if the memory that we're going to allocate will be

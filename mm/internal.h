@@ -138,9 +138,16 @@ extern bool cgroup_memory_nokmem;
  * by a const pointer.
  */
 struct alloc_context {
+	// 运行进程 CPU 所在 NUMA 节点以及其所有备用 NUMA 节点中允许内存分配的内存区域
 	struct zonelist *zonelist;
+
+	// NUMA 节点掩码
 	nodemask_t *nodemask;
+
+	// 内存分配最Prefer的内存区域 zone
 	struct zoneref *preferred_zoneref;
+
+	// 物理内存页的迁移类型分为：不可迁移，可回收，可迁移类型——防止内存碎片
 	int migratetype;
 
 	/*
@@ -153,7 +160,10 @@ struct alloc_context {
 	 * the target zone since higher zone than this index cannot be
 	 * usable for this allocation request.
 	 */
+	// 可使用的最高优先级zone
 	enum zone_type highest_zoneidx;
+
+	// 是否允许当前 NUMA 节点中的脏页均衡扩散迁移至其他 NUMA 节点
 	bool spread_dirty_pages;
 };
 
@@ -572,7 +582,9 @@ extern unsigned long  __must_check vm_mmap_pgoff(struct file *, unsigned long,
 extern void set_pageblock_order(void);
 unsigned int reclaim_clean_pages_from_list(struct zone *zone,
 					    struct list_head *page_list);
-/* The ALLOC_WMARK bits are used as an index to zone->watermark */
+/** The ALLOC_WMARK bits are used as an index to zone->watermark 
+ * 表示内存水位线至少达到某个标准，才进行物理页分配
+*/
 #define ALLOC_WMARK_MIN		WMARK_MIN
 #define ALLOC_WMARK_LOW		WMARK_LOW
 #define ALLOC_WMARK_HIGH	WMARK_HIGH
@@ -592,9 +604,9 @@ unsigned int reclaim_clean_pages_from_list(struct zone *zone,
 #define ALLOC_OOM		ALLOC_NO_WATERMARKS
 #endif
 
-#define ALLOC_HARDER		 0x10 /* try to alloc harder */
-#define ALLOC_HIGH		 0x20 /* __GFP_HIGH set */
-#define ALLOC_CPUSET		 0x40 /* check for correct cpuset */
+#define ALLOC_HARDER		 0x10 /* try to alloc harder, 降低min水位线 */
+#define ALLOC_HIGH		 0x20 /* __GFP_HIGH set, 高优先级请求，可以启用预留内存*/
+#define ALLOC_CPUSET		 0x40 /* check for correct cpuset, 只能在当前进程关联的节点中分配*/
 #define ALLOC_CMA		 0x80 /* allow allocations from CMA areas */
 #ifdef CONFIG_ZONE_DMA32
 #define ALLOC_NOFRAGMENT	0x100 /* avoid mixing pageblock types */
