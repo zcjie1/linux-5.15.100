@@ -4751,17 +4751,24 @@ static bool oom_reserves_allowed(struct task_struct *tsk)
  */
 static inline int __gfp_pfmemalloc_flags(gfp_t gfp_mask)
 {
+	// 如果不允许从紧急预留内存中分配，则不改变 alloc_flags
 	if (unlikely(gfp_mask & __GFP_NOMEMALLOC))
 		return 0;
+	
+	// 如果允许从紧急预留内存中分配，则后面的内存分配会忽略内存水位线的限制
 	if (gfp_mask & __GFP_MEMALLOC)
 		return ALLOC_NO_WATERMARKS;
+	
+	// 当前进程处于软中断上下文并且进程设置了 PF_MEMALLOC 标识，则忽略水位线
 	if (in_serving_softirq() && (current->flags & PF_MEMALLOC))
 		return ALLOC_NO_WATERMARKS;
+	
+	// 当前进程不在任何中断上下文中，即在进程上下文中
 	if (!in_interrupt()) {
-		if (current->flags & PF_MEMALLOC)
+		if (current->flags & PF_MEMALLOC) // 若置位PF_MEMALLOC，则忽略水位线
 			return ALLOC_NO_WATERMARKS;
-		else if (oom_reserves_allowed(current))
-			return ALLOC_OOM;
+		else if (oom_reserves_allowed(current)) // 若当前进程是OOM选择的对象
+			return ALLOC_OOM; // 允许当前进程进行 OOM
 	}
 
 	return 0;
@@ -5022,8 +5029,8 @@ restart:
 			 * order, fail immediately unless the allocator has
 			 * requested compaction and reclaim retry.
 			 * 
-			 * 无法整理 或 直接回收内存更加合适
-			 * 由于最近分配同样数量物理页失败了，内存整理行为被推迟了
+			 * 1. 无法整理 或 直接回收内存更加合适
+			 * 2. 由于最近分配同样数量物理页失败了，内存整理行为被推迟了
 			 *
 			 * Reclaim is
 			 *  - potentially very expensive because zones are far
@@ -5122,7 +5129,7 @@ retry:
 
 	/**
 	 * 1. 如果内核已经重试了 MAX_RECLAIM_RETRIES (16) 次仍然失败，则放弃重试执行后续 OOM
-	 * 2. 如果内核将所有可选内存区域中的所有可回收页面全部回收之后，仍然无法满足内存的分配，那么放弃重试执行后续 OOM
+	 * 2. 如果内核将所有可选内存区域中的所有可回收页面(LRU链表)全部回收之后，仍然无法满足内存的分配，那么放弃重试执行后续 OOM
 	*/
 	if (should_reclaim_retry(gfp_mask, order, ac, alloc_flags,
 				 did_some_progress > 0, &no_progress_loops))
@@ -5167,6 +5174,7 @@ retry:
 	 * OOM选中了当前进程
 	 * 且当前进程的内存分配策略已经很激进
 	 * 直接分配失败
+	 * 当前进程即将被干掉
 	*/
 	if (tsk_is_oom_victim(current) &&
 	    (alloc_flags & ALLOC_OOM ||
@@ -5183,6 +5191,8 @@ nopage:
 	/*
 	 * Deal with possible cpuset update races or zonelist updates to avoid
 	 * a unnecessary OOM kill.
+	 * 
+	 * 最后挣扎一下下
 	 */
 	if (check_retry_cpuset(cpuset_mems_cookie, ac) ||
 	    check_retry_zonelist(zonelist_iter_cookie))
@@ -5191,6 +5201,8 @@ nopage:
 	/*
 	 * Make sure that __GFP_NOFAIL request doesn't leak out and make sure
 	 * we always retry
+	 * 
+	 * 如果置位了 "NOFAIL" 标志位，再挣扎一下下
 	 */
 	if (gfp_mask & __GFP_NOFAIL) {
 		/*
@@ -5204,6 +5216,8 @@ nopage:
 		 * PF_MEMALLOC request from this context is rather bizarre
 		 * because we cannot reclaim anything and only can loop waiting
 		 * for somebody to do a work for us
+		 * 
+		 * 内核已然无能为力，向用户发出警告
 		 */
 		WARN_ON_ONCE(current->flags & PF_MEMALLOC);
 
@@ -5212,6 +5226,8 @@ nopage:
 		 * are not prepared for much so let's warn about these users
 		 * so that we can identify them and convert them to something
 		 * else.
+		 * 
+		 * 内核已然无能为力，向用户发出警告
 		 */
 		WARN_ON_ONCE(order > PAGE_ALLOC_COSTLY_ORDER);
 
@@ -5220,11 +5236,18 @@ nopage:
 		 * reserves but do not use ALLOC_NO_WATERMARKS because this
 		 * could deplete whole memory reserves which would just make
 		 * the situation worse
+		 * 
+		 * 尝试进行跨 NUMA 节点内存分配
 		 */
 		page = __alloc_pages_cpuset_fallback(gfp_mask, order, ALLOC_HARDER, ac);
 		if (page)
 			goto got_pg;
 
+		/**
+		 * 在进行内存分配重试流程之前，需要让 CPU 重新调度到其他进程上
+		 * 运行一会其他进程，因为毕竟此时内存已经严重不足
+		 * 立刻重试只能浪费过多时间在搜索空闲内存上，导致其他进程处于饥饿状态
+		*/
 		cond_resched();
 		goto retry;
 	}
