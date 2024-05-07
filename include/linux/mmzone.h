@@ -40,11 +40,13 @@
 #define PAGE_ALLOC_COSTLY_ORDER 3
 
 enum migratetype {
-	MIGRATE_UNMOVABLE,
-	MIGRATE_MOVABLE,
-	MIGRATE_RECLAIMABLE,
-	MIGRATE_PCPTYPES,	/* the number of types on the pcp lists */
-	MIGRATE_HIGHATOMIC = MIGRATE_PCPTYPES,
+	MIGRATE_UNMOVABLE, // 不可移动
+	MIGRATE_MOVABLE, // 可移动
+	MIGRATE_RECLAIMABLE, // 可回收
+
+	/*CPU高速缓存 number of types on the pcp lists,PCP=PER_CPU_PAGESET */
+	MIGRATE_PCPTYPES,	
+	MIGRATE_HIGHATOMIC = MIGRATE_PCPTYPES, // 紧急内存
 #ifdef CONFIG_CMA
 	/*
 	 * MIGRATE_CMA migration type is designed to mimic the way
@@ -59,7 +61,7 @@ enum migratetype {
 	 * MAX_ORDER_NR_PAGES should biggest page be bigger than
 	 * a single pageblock.
 	 */
-	MIGRATE_CMA,
+	MIGRATE_CMA, // 预留的连续内存
 #endif
 #ifdef CONFIG_MEMORY_ISOLATION
 	MIGRATE_ISOLATE,	/* can't allocate from here */
@@ -94,9 +96,10 @@ extern int page_group_by_mobility_disabled;
 #define get_pageblock_migratetype(page)					\
 	get_pfnblock_flags_mask(page, page_to_pfn(page), MIGRATETYPE_MASK)
 
+// 伙伴系统管理核心数据结构
 struct free_area {
 	struct list_head	free_list[MIGRATE_TYPES];
-	unsigned long		nr_free;
+	unsigned long		nr_free; // 空闲块的个数
 };
 
 static inline struct page *get_page_from_free_area(struct free_area *area,

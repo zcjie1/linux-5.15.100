@@ -144,7 +144,7 @@ struct alloc_context {
 	// NUMA 节点掩码
 	nodemask_t *nodemask;
 
-	// 内存分配最Prefer的内存区域 zone
+	// 内存分配最prefer的内存区域 zone
 	struct zoneref *preferred_zoneref;
 
 	// 物理内存页的迁移类型分为：不可迁移，可回收，可迁移类型——防止内存碎片

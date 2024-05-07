@@ -2471,6 +2471,8 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 /*
  * This array describes the order lists are fallen back to when
  * the free lists for the desirable migrate type are depleted
+ * 
+ * 伙伴系统中每类MIGRATE_TYPE的备用类型顺序
  */
 static int fallbacks[MIGRATE_TYPES][3] = {
 	[MIGRATE_UNMOVABLE]   = { MIGRATE_RECLAIMABLE, MIGRATE_MOVABLE,   MIGRATE_TYPES },
@@ -4046,8 +4048,14 @@ get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
 						const struct alloc_context *ac)
 {
 	struct zoneref *z;
+
+	// 当前遍历到的内存区域 zone
 	struct zone *zone;
+
+	// 最近遍历的NUMA节点
 	struct pglist_data *last_pgdat_dirty_limit = NULL;
+
+	// 如果需要避免内存碎片，则 no_fallback = true
 	bool no_fallback;
 
 retry:
@@ -4055,13 +4063,17 @@ retry:
 	 * Scan zonelist, looking for a zone with enough free.
 	 * See also __cpuset_node_allowed() comment in kernel/cpuset.c.
 	 */
-	no_fallback = alloc_flags & ALLOC_NOFRAGMENT;
+	no_fallback = alloc_flags & ALLOC_NOFRAGMENT; // 是否需要避免内存碎片
+
 	z = ac->preferred_zoneref;
+
+	// 开始遍历 zonelist，查找可以满足本次内存分配的物理内存区域 zone
 	for_next_zone_zonelist_nodemask(zone, z, ac->highest_zoneidx,
 					ac->nodemask) {
-		struct page *page;
-		unsigned long mark;
+		struct page *page; // 指向分配成功之后的内存
+		unsigned long mark; // 内存分配过程中设定的水位线
 
+		// 检查内存区域所在 NUMA 节点是否在进程所允许的 CPU 上
 		if (cpusets_enabled() &&
 			(alloc_flags & ALLOC_CPUSET) &&
 			!__cpuset_zone_allowed(zone, gfp_mask))
@@ -4084,17 +4096,26 @@ retry:
 		 * global limit.  The proper fix for these situations
 		 * will require awareness of nodes in the
 		 * dirty-throttling and the flusher threads.
+		 * 
+		 * 每个 NUMA 节点中包含的脏页数量都有一定的限制
+		 * 如果本次内存分配是为 page cache 分配的 page，用于写入数据（不久就会变成脏页）
+		 * 这里需要检查当前 NUMA 节点的脏页比例是否在限制范围内允许的
+		 * 如果没有超过脏页限制则可以进行分配，若已经超过则置位标志位
 		 */
 		if (ac->spread_dirty_pages) {
 			if (last_pgdat_dirty_limit == zone->zone_pgdat)
 				continue;
 
-			if (!node_dirty_ok(zone->zone_pgdat)) {
+			if (!node_dirty_ok(zone->zone_pgdat)) { // 若脏页超出限制
 				last_pgdat_dirty_limit = zone->zone_pgdat;
 				continue;
 			}
 		}
 
+		/**
+		 * 如果内核设置了避免内存碎片标识，在本地节点无法满足内存分配的情况下(因为需要避免内存碎片)
+		 * 这轮循环会遍历 remote 节点（跨NUMA节点）
+		*/
 		if (no_fallback && nr_online_nodes > 1 &&
 		    zone != ac->preferred_zoneref->zone) {
 			int local_nid;
@@ -4103,6 +4124,10 @@ retry:
 			 * If moving to a remote node, retry but allow
 			 * fragmenting fallbacks. Locality is more important
 			 * than fragmentation avoidance.
+			 * 
+			 * 如果本地节点分配内存失败是因为避免内存碎片的原因
+			 * 那么会继续回到本地节点进行 retry 重试同时取消 ALLOC_NOFRAGMENT
+			 * 内核认为保证本地的局部性会比避免内存碎片更加重要
 			 */
 			local_nid = zone_to_nid(ac->preferred_zoneref->zone);
 			if (zone_to_nid(zone) != local_nid) {
@@ -4111,7 +4136,11 @@ retry:
 			}
 		}
 
+		// 获取本次内存分配需要考虑到的内存水位线，快速路径下是 WMARK_LOW, 慢速路径下是 WMARK_MIN
 		mark = wmark_pages(zone, alloc_flags & ALLOC_WMARK_MASK);
+
+		// 检查当前遍历到的 zone 里剩余的空闲内存容量是否在指定水位线 mark 之上
+		// 剩余内存容量在水位线之下返回 false
 		if (!zone_watermark_fast(zone, order, mark,
 				       ac->highest_zoneidx, alloc_flags,
 				       gfp_mask)) {
@@ -4129,23 +4158,31 @@ retry:
 #endif
 			/* Checked here to keep the fast path fast */
 			BUILD_BUG_ON(ALLOC_NO_WATERMARKS < NR_WMARK);
+
+			// 如果本次内存分配策略是忽略内存水位线，那么就在本次遍历到的zone里尝试分配内存
 			if (alloc_flags & ALLOC_NO_WATERMARKS)
 				goto try_this_zone;
 
+			// 如果本次内存分配不能忽略内存水位线的限制，那么就会判断当前 zone 所属 NUMA 节点是否允许进行内存回收
 			if (!node_reclaim_enabled() ||
 			    !zone_allows_reclaim(ac->preferred_zoneref->zone, zone))
 				continue;
 
+			// 针对当前 zone 所在 NUMA 节点进行内存回收
 			ret = node_reclaim(zone->zone_pgdat, gfp_mask, order);
 			switch (ret) {
+			
+			// 返回该值表示当前 NUMA 节点没有必要进行回收。比如快速分配路径下就不处理页面回收的问题
 			case NODE_RECLAIM_NOSCAN:
 				/* did not scan */
 				continue;
+			
+			// 返回该值表示通过扫描之后发现当前 NUMA 节点并没有可以回收的内存页 
 			case NODE_RECLAIM_FULL:
 				/* scanned but unreclaimable */
 				continue;
 			default:
-				/* did we reclaim enough */
+				/* did we reclaim enough 判断是否回收了足够的内存 */
 				if (zone_watermark_ok(zone, order, mark,
 					ac->highest_zoneidx, alloc_flags))
 					goto try_this_zone;
@@ -4155,14 +4192,18 @@ retry:
 		}
 
 try_this_zone:
+		// 伙伴系统分配页面的核心入口
 		page = rmqueue(ac->preferred_zoneref->zone, zone, order,
 				gfp_mask, alloc_flags, ac->migratetype);
 		if (page) {
+			// 初始化页面
 			prep_new_page(page, order, gfp_mask, alloc_flags);
 
 			/*
 			 * If this is a high-order atomic allocation then check
 			 * if the pageblock should be reserved for the future
+			 * 
+			 * 增加预留内存nr_reserved_highatomic
 			 */
 			if (unlikely(order && (alloc_flags & ALLOC_HARDER)))
 				reserve_highatomic_pageblock(page, zone, order);

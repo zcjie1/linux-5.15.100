@@ -1564,6 +1564,7 @@ int __sys_socket(int family, int type, int protocol)
 	return sock_map_fd(sock, flags & (O_CLOEXEC | O_NONBLOCK));
 }
 
+// socket系统调用
 SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
 {
 	return __sys_socket(family, type, protocol);
