@@ -3820,13 +3820,18 @@ ALLOW_ERROR_INJECTION(should_fail_alloc_page, TRUE);
 static inline long __zone_watermark_unusable_free(struct zone *z,
 				unsigned int order, unsigned int alloc_flags)
 {
+	// ALLOC_HARDER 的设置表示可以使用 high-atomic 紧急预留内存
 	const bool alloc_harder = (alloc_flags & (ALLOC_HARDER|ALLOC_OOM));
+
+	// 由于需要分配order阶的内存，这里预先减去
 	long unusable_free = (1 << order) - 1;
 
 	/*
 	 * If the caller does not have rights to ALLOC_HARDER then subtract
 	 * the high-atomic reserves. This will over-estimate the size of the
 	 * atomic reserve but it avoids a search.
+	 * 
+	 * 如果没有设置 ALLOC_HARDER 则不能使用  high_atomic 紧急预留内存
 	 */
 	if (likely(!alloc_harder))
 		unusable_free += z->nr_reserved_highatomic;
@@ -3850,6 +3855,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 			 int highest_zoneidx, unsigned int alloc_flags,
 			 long free_pages)
 {
+	// 保证内存分配顺利进行的最低水位线
 	long min = mark;
 	int o;
 	const bool alloc_harder = (alloc_flags & (ALLOC_HARDER|ALLOC_OOM));
@@ -3857,6 +3863,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 	/* free_pages may go negative - that's OK */
 	free_pages -= __zone_watermark_unusable_free(z, order, alloc_flags);
 
+	// 如果设置了 ALLOC_HIGH 则水位线降低二分之一，使内存分配更加努力激进一些
 	if (alloc_flags & ALLOC_HIGH)
 		min -= min / 2;
 
@@ -3877,6 +3884,8 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 	 * Check watermarks for an order-0 allocation request. If these
 	 * are not met, then a high-order request also cannot go ahead
 	 * even if a suitable page happened to be free.
+	 * 
+	 * 内存的分配必须保证可用剩余内存容量在指定水位线之上，否则不能进行内存分配
 	 */
 	if (free_pages <= min + z->lowmem_reserve[highest_zoneidx])
 		return false;
@@ -3885,7 +3894,9 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 	if (!order)
 		return true;
 
-	/* For a high-order request, check at least one suitable page is free */
+	/** For a high-order request, check at least one suitable page is free
+	 * 这里需要检查高阶 free_list 中是否有足够的空闲内存块可供分配 
+	 */
 	for (o = order; o < MAX_ORDER; o++) {
 		struct free_area *area = &z->free_area[o];
 		int mt;
@@ -3893,6 +3904,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 		if (!area->nr_free)
 			continue;
 
+		// 检查 free_area 中是否有某个迁移类型有足够的内存块
 		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++) {
 			if (!free_area_empty(area, mt))
 				return true;
@@ -3904,6 +3916,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 			return true;
 		}
 #endif
+		// 如果设置了 ALLOC_HARDER，则表示可以从 HIGHATOMIC 区中的紧急预留内存中分配，检查对应 free_list
 		if (alloc_harder && !free_area_empty(area, MIGRATE_HIGHATOMIC))
 			return true;
 	}
@@ -3923,25 +3936,41 @@ static inline bool zone_watermark_fast(struct zone *z, unsigned int order,
 {
 	long free_pages;
 
+	// 获取当前内存区域中所有空闲的物理内存页(包含lowmem_reserve和highatomic预留内存)
 	free_pages = zone_page_state(z, NR_FREE_PAGES);
 
 	/*
 	 * Fast check for order-0 only. If this fails then the reserves
 	 * need to be calculated.
+	 * 
+	 * 快速检查分配阶 order = 0 情况下相关水位线，空闲内存需要刨除掉为 highatomic 预留的紧急内存
 	 */
 	if (!order) {
 		long usable_free;
 		long reserved;
 
+		/**
+		 * 可供本次内存分配使用的符合要求的真实可用内存，初始为 free_pages
+		 * free_pages 为空闲内存页的全集其中也包括了不能为本次内存分配提供内存的空闲内存
+		 * 比如紧急预留内存
+		*/
 		usable_free = free_pages;
+
+		// 获取本次不能使用的空闲内存页数量
 		reserved = __zone_watermark_unusable_free(z, 0, alloc_flags);
 
 		/* reserved may over estimate high-atomic reserves. */
 		usable_free -= min(usable_free, reserved);
+
+		/**
+		 * 如果可用的空闲内存页数量大于内存水位线与预留内存之和
+		 * 那么表示物理内存区域中的可用空闲内存能够满足本次内存分配的需要
+		*/
 		if (usable_free > mark + z->lowmem_reserve[highest_zoneidx])
 			return true;
 	}
 
+	// 近一步检查内存区域伙伴系统中是否有足够的 order 阶的内存块可供分配
 	if (__zone_watermark_ok(z, order, mark, highest_zoneidx, alloc_flags,
 					free_pages))
 		return true;
