@@ -359,7 +359,9 @@ enum zone_watermarks {
 #define high_wmark_pages(z) (z->_watermark[WMARK_HIGH] + z->watermark_boost)
 #define wmark_pages(z, i) (z->_watermark[i] + z->watermark_boost)
 
-/* Fields and list protected by pagesets local_lock in page_alloc.c */
+/** Fields and list protected by pagesets local_lock in page_alloc.c
+ * 用于管理CPU的冷热页
+ */
 struct per_cpu_pages {
 	int count;		/* number of pages in the list */
 	int high;		/* high watermark, emptying needed 高速缓存中的页面数上限*/
@@ -371,7 +373,7 @@ struct per_cpu_pages {
 
 	/**
 	 * Lists of pages, one per migrate type stored on the pcp-lists 
-	 * 每一中页面迁移类型(可迁移、可回收、不可迁移)对应一个冷热页链表
+	 * 每一中页面迁移类型(可迁移、可回收、不可迁移)的每种order对应一个冷热页链表
 	 * 热页放在链表头部，冷页放在链表尾部
 	*/
 	struct list_head lists[NR_PCP_LISTS];

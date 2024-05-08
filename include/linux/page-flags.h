@@ -99,6 +99,8 @@
  * The fields area is reserved for fields mapping zone, node (for NUMA) and
  * SPARSEMEM section (for variants of SPARSEMEM that require section ids like
  * SPARSEMEM_EXTREME with !SPARSEMEM_VMEMMAP).
+ * 
+ * struct page 页标志位
  */
 enum pageflags {
 	PG_locked,		/* Page is locked. Don't touch. */
@@ -591,7 +593,8 @@ __PAGEFLAG(Head, head, PF_ANY) CLEARPAGEFLAG(Head, head, PF_ANY)
 
 static __always_inline void set_compound_head(struct page *page, struct page *head)
 {
-	WRITE_ONCE(page->compound_head, (unsigned long)head + 1);
+	// compound_head 与 1 进行 & 操作可以判断是否为Tail page
+	WRITE_ONCE(page->compound_head, (unsigned long)head + 1); 
 }
 
 static __always_inline void clear_compound_head(struct page *page)

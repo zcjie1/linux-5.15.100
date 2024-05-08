@@ -728,20 +728,27 @@ void free_compound_page(struct page *page)
 	free_the_page(page, compound_order(page));
 }
 
+// 设置复合页
 void prep_compound_page(struct page *page, unsigned int order)
 {
 	int i;
 	int nr_pages = 1 << order;
 
+	// 设置首页 page 中的 flags 为 PG_head
 	__SetPageHead(page);
+
+	// 首页之后的 page 全部是尾页，循环遍历设置尾页
 	for (i = 1; i < nr_pages; i++) {
 		struct page *p = page + i;
-		p->mapping = TAIL_MAPPING;
-		set_compound_head(p, page);
+		p->mapping = TAIL_MAPPING; // 设置尾页标识
+		set_compound_head(p, page); // 尾页 page 结构中的 compound_head 指向首页
 	}
 
+	// 设置首页相关属性
 	set_compound_page_dtor(page, COMPOUND_PAGE_DTOR);
 	set_compound_order(page, order);
+
+	// 进行匿名页或文件页的反向映射时会 "+1"
 	atomic_set(compound_mapcount_ptr(page), -1);
 	if (hpage_pincount_available(page))
 		atomic_set(compound_pincount_ptr(page), 0);
@@ -1260,6 +1267,7 @@ out:
 	return ret;
 }
 
+// 页清零
 static void kernel_init_free_pages(struct page *page, int numpages, bool zero_tags)
 {
 	int i;
@@ -2272,7 +2280,8 @@ void __init init_cma_reserved_pageblock(struct page *page)
 }
 #endif
 
-/*
+/* 将较大的空闲页块减半分裂依次插入对应的free_area
+ *
  * The order of subdivision here is critical for the IO subsystem.
  * Please do not alter this order without good reasons and regression
  * testing. Specifically, as large blocks of memory are subdivided,
@@ -2289,8 +2298,10 @@ void __init init_cma_reserved_pageblock(struct page *page)
 static inline void expand(struct zone *zone, struct page *page,
 	int low, int high, int migratetype)
 {
+	// 当前的空闲页块size
 	unsigned long size = 1 << high;
 
+	// 当current_order大于初始order时
 	while (high > low) {
 		high--;
 		size >>= 1;
@@ -2301,11 +2312,16 @@ static inline void expand(struct zone *zone, struct page *page,
 		 * merge back to allocator when buddy will be freed.
 		 * Corresponding page table entries will not be touched,
 		 * pages will stay not present in virtual address space
+		 * 
+		 * 标记为保护页，当其伙伴被释放时，允许合并(debug时有效)
 		 */
 		if (set_page_guard(zone, &page[size], high, migratetype))
 			continue;
-
+		
+		//将本次减半分裂出来的第二个内存块插入到对应 free_area[high] 中
 		add_to_free_list(&page[size], zone, high, migratetype);
+
+		// 设置内存块的分配阶 high
 		set_buddy_order(&page[size], high);
 	}
 }
@@ -2372,6 +2388,7 @@ static inline bool check_new_pcp(struct page *page)
 }
 #endif /* CONFIG_DEBUG_VM */
 
+// 若某个new page存在问题，返回true
 static bool check_new_pages(struct page *page, unsigned int order)
 {
 	int i;
@@ -2388,7 +2405,10 @@ static bool check_new_pages(struct page *page, unsigned int order)
 inline void post_alloc_hook(struct page *page, unsigned int order,
 				gfp_t gfp_flags)
 {
+	// 清空private指针
 	set_page_private(page, 0);
+
+	// 设置引用计数为1
 	set_page_refcounted(page);
 
 	arch_alloc_page(page, order);
@@ -2420,11 +2440,14 @@ inline void post_alloc_hook(struct page *page, unsigned int order,
 	set_page_owner(page, order, gfp_flags);
 }
 
+// 初始化物理页
 static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
 							unsigned int alloc_flags)
 {
+	// 初始化 struct page，清除一些页面属性标记
 	post_alloc_hook(page, order, gfp_flags);
 
+	// 设置复合页
 	if (order && (gfp_flags & __GFP_COMP))
 		prep_compound_page(page, order);
 
@@ -2433,6 +2456,9 @@ static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags
 	 * allocate the page. The expectation is that the caller is taking
 	 * steps that will free more memory. The caller should avoid the page
 	 * being used for !PFMEMALLOC purposes.
+	 * 
+	 * 使用 set_page_XXX(page) 方法设置 page 的 PG_XXX 标志位
+	 * 使用 clear_page_XXX(page) 方法清除 page 的 PG_XXX 标志位
 	 */
 	if (alloc_flags & ALLOC_NO_WATERMARKS)
 		set_page_pfmemalloc(page);
@@ -2459,8 +2485,8 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 		if (!page)
 			continue;
 		del_page_from_free_list(page, zone, current_order);
-		expand(zone, page, order, current_order, migratetype);
-		set_pcppage_migratetype(page, migratetype);
+		expand(zone, page, order, current_order, migratetype); // 减半分裂插入对应free_area
+		set_pcppage_migratetype(page, migratetype); // 设置页面的迁移类型
 		return page;
 	}
 
@@ -3573,8 +3599,8 @@ void __putback_isolated_page(struct page *page, unsigned int order, int mt)
 
 /*
  * Update NUMA hit/miss statistics
- *
- * Must be called with interrupts disabled.
+ * 
+ * 万恶的华为把修注释的机会抢了
  */
 static inline void zone_statistics(struct zone *preferred_zone, struct zone *z,
 				   long nr_account)
@@ -3610,6 +3636,7 @@ struct page *__rmqueue_pcplist(struct zone *zone, unsigned int order,
 	struct page *page;
 
 	do {
+		// 若当前 pcplist 中的页面为空，那么则从伙伴系统中获取 batch 个页面放入 pcplist 中
 		if (list_empty(list)) {
 			int batch = READ_ONCE(pcp->batch);
 			int alloced;
@@ -3632,10 +3659,13 @@ struct page *__rmqueue_pcplist(struct zone *zone, unsigned int order,
 				return NULL;
 		}
 
+		// 获取 pcplist 上的第一个物理页面
 		page = list_first_entry(list, struct page, lru);
+
+		// 将该物理页面从 pcplist 中摘除
 		list_del(&page->lru);
 		pcp->count -= 1 << order;
-	} while (check_new_pcp(page));
+	} while (check_new_pcp(page)); // 这里有误，可以改成check_new_pages(page, order)
 
 	return page;
 }
@@ -3670,8 +3700,9 @@ static struct page *rmqueue_pcplist(struct zone *preferred_zone,
 	return page;
 }
 
-/*
+/**
  * Allocate a page from the given zone. Use pcplists for order-0 allocations.
+ * 伙伴系统分配页面核心逻辑
  */
 static inline
 struct page *rmqueue(struct zone *preferred_zone,
@@ -3682,10 +3713,19 @@ struct page *rmqueue(struct zone *preferred_zone,
 	unsigned long flags;
 	struct page *page;
 
+	/**
+	 * 当我们申请一个物理页面（order < 3）时，内核首先会从 CPU 高速缓存列表 pcplist 中直接分配
+	 * 而不会走伙伴系统，提高内存分配速度
+	*/
 	if (likely(pcp_allowed_order(order))) {
 		/*
 		 * MIGRATE_MOVABLE pcplist could have the pages on CMA area and
 		 * we need to skip it when CMA area isn't allowed.
+		 * 
+		 * 三者任选其一
+		 * 1. CMA未使能
+		 * 2. CMA允许
+		 * 3. 分配的不是可移动页面
 		 */
 		if (!IS_ENABLED(CONFIG_CMA) || alloc_flags & ALLOC_CMA ||
 				migratetype != MIGRATE_MOVABLE) {
@@ -3698,8 +3738,12 @@ struct page *rmqueue(struct zone *preferred_zone,
 	/*
 	 * We most definitely don't want callers attempting to
 	 * allocate greater than order-1 page units with __GFP_NOFAIL.
+	 * 
+	 * 不建议使用__GFP_NOFAIL标志大于2页的分配行为
 	 */
 	WARN_ON_ONCE((gfp_flags & __GFP_NOFAIL) && (order > 1));
+
+	// 加锁并关闭中断，防止并发访问
 	spin_lock_irqsave(&zone->lock, flags);
 
 	do {
@@ -3709,6 +3753,9 @@ struct page *rmqueue(struct zone *preferred_zone,
 		 * due to non-CMA allocation context. HIGHATOMIC area is
 		 * reserved for high-order atomic allocation, so order-0
 		 * request should skip it.
+		 * 
+		 * 如果设置了 ALLOC_HARDER 分配策略 且 order > 0
+		 * 则从伙伴系统的 HIGHATOMIC 迁移类型的 freelist 中获取
 		 */
 		if (order > 0 && alloc_flags & ALLOC_HARDER) {
 			page = __rmqueue_smallest(zone, order, MIGRATE_HIGHATOMIC);
@@ -3716,16 +3763,21 @@ struct page *rmqueue(struct zone *preferred_zone,
 				trace_mm_page_alloc_zone_locked(page, order, migratetype);
 		}
 		if (!page)
-			page = __rmqueue(zone, order, migratetype, alloc_flags);
+			page = __rmqueue(zone, order, migratetype, alloc_flags); // 从伙伴系统中申请分配阶 order 大小的物理内存块
 	} while (page && check_new_pages(page, order));
 	if (!page)
 		goto failed;
 
+	// 更新free_pages
 	__mod_zone_freepage_state(zone, -(1 << order),
 				  get_pcppage_migratetype(page));
+	
+	// 解锁
 	spin_unlock_irqrestore(&zone->lock, flags);
 
 	__count_zid_vm_events(PGALLOC, page_zonenum(page), 1 << order);
+
+	// 重新统计内存区域中的相关指标
 	zone_statistics(preferred_zone, zone, 1);
 
 out:

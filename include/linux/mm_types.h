@@ -172,7 +172,7 @@ struct page {
 			/* First tail page only */
 			unsigned char compound_dtor; // 用于释放复合页的析构函数，保存在首页中
 			unsigned char compound_order; // 该复合页由多少个 page 组成
-			atomic_t compound_mapcount; // 该复合页被多少个进程使用，内存页反向映射的概念，首页中保存
+			atomic_t compound_mapcount; // 该复合页被多少个进程使用(不包含初始进程)，内存页反向映射的概念，首页中保存
 			unsigned int compound_nr; /* 1 << compound_order */
 		};
 		struct {	/* Second tail page of compound page */
@@ -222,7 +222,7 @@ struct page {
 		 * If the page can be mapped to userspace, encodes the number
 		 * of times this page is referenced by a page table.
 		 * 
-		 * 表示该 page 映射了多少个进程的虚拟内存空间
+		 * 表示该 page 映射了多少个进程(不包含初始进程且不用于复合页)的虚拟内存空间
 		 */
 		atomic_t _mapcount;
 
@@ -238,7 +238,9 @@ struct page {
 		int units;			/* SLOB */
 	};
 
-	/* Usage count. *DO NOT USE DIRECTLY*. See page_ref.h */
+	/** Usage count. *DO NOT USE DIRECTLY*. See page_ref.h 
+	 * 用于 普通页 或 复合页的首页
+	*/
 	atomic_t _refcount;
 
 #ifdef CONFIG_MEMCG

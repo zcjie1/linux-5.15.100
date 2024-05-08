@@ -930,6 +930,7 @@ enum compound_dtor_id {
 };
 extern compound_page_dtor * const compound_page_dtors[NR_COMPOUND_DTORS];
 
+// 复合页析构函数设置
 static inline void set_compound_page_dtor(struct page *page,
 		enum compound_dtor_id compound_dtor)
 {
@@ -973,6 +974,7 @@ static inline int compound_pincount(struct page *page)
 	return head_compound_pincount(page);
 }
 
+// 复合页阶数-数量设置
 static inline void set_compound_order(struct page *page, unsigned int order)
 {
 	page[1].compound_order = order;

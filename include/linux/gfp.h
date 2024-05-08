@@ -78,7 +78,7 @@ struct vm_area_struct;
 // 允许从所有区域分配内存(包括紧急预留内存)
 #define ___GFP_MEMALLOC		0x20000u
 
-
+// 复合页
 #define ___GFP_COMP		0x40000u
 
 // 明确禁止内核从紧急预留内存中获取内存，优先级高于___GFP_MEMALLOC
