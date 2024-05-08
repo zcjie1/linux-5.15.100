@@ -104,6 +104,7 @@ struct page {
 			 * 例如，它在页磁盘映像或匿名区中标识存放在页框中的数据的位置，或者它存放一个换出页标识符
 			 * 当 page 为文件页，index 为 page 在 page cache 中的索引
 			 * 当 page 为匿名页，表示匿名页在对应进程虚拟内存区域 VMA 中的偏移或是页的线性地址/PAGE_SIZE
+			 * 当 page 处在pcp_list，表示迁移类型
 			*/
 			pgoff_t index;
 

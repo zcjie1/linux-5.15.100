@@ -365,6 +365,7 @@ EXPORT_SYMBOL(nr_node_ids);
 EXPORT_SYMBOL(nr_online_nodes);
 #endif
 
+// 所有物理页不可移动
 int page_group_by_mobility_disabled __read_mostly;
 
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
@@ -1068,9 +1069,17 @@ static inline void __free_one_page(struct page *page,
 		int migratetype, fpi_t fpi_flags)
 {
 	struct capture_control *capc = task_capc(zone);
+
+	// 伙伴内存块的 pfn
 	unsigned long buddy_pfn;
+
+	// 释放内存块与其伙伴内存块合并之后新内存块的 pfn
 	unsigned long combined_pfn;
+
+	// 伙伴系统中的最大分配阶
 	unsigned int max_order;
+
+	// 伙伴内存块的首页 page 指针
 	struct page *buddy;
 	bool to_tail;
 
@@ -1093,9 +1102,14 @@ continue_merging:
 								migratetype);
 			return;
 		}
+
+		// 在 free_area[order] 中查找伙伴内存块的 pfn
 		buddy_pfn = __find_buddy_pfn(pfn, order);
+
+		// 根据偏移 buddy_pfn - pfn 计算伙伴内存块中的首页 page 地址
 		buddy = page + (buddy_pfn - pfn);
 
+		// 检查是否为伙伴
 		if (!page_is_buddy(page, buddy, order))
 			goto done_merging;
 		/*
@@ -1105,10 +1119,18 @@ continue_merging:
 		if (page_is_guard(buddy))
 			clear_page_guard(zone, buddy, order, migratetype);
 		else
-			del_page_from_free_list(buddy, zone, order);
+			del_page_from_free_list(buddy, zone, order); // 摘下伙伴内存块
+		
+		// 合并后新内存块首页 page 的 pfn
 		combined_pfn = buddy_pfn & pfn;
+
+		// 合并后新内存块首页 page 指针
 		page = page + (combined_pfn - pfn);
+
+		// 以合并后的新内存块为基础继续向高阶 free_area 合并
 		pfn = combined_pfn;
+
+		// 继续向高阶 free_area 合并
 		order++;
 	}
 	if (order < MAX_ORDER - 1) {
@@ -1137,6 +1159,8 @@ continue_merging:
 	}
 
 done_merging:
+
+	// 设置内存块的分配阶 order, 存储在第一个 page 结构中的 private 属性中
 	set_buddy_order(page, order);
 
 	if (fpi_flags & FPI_TO_TAIL)
@@ -1648,9 +1672,11 @@ static void __free_pages_ok(struct page *page, unsigned int order,
 	unsigned long pfn = page_to_pfn(page);
 	struct zone *zone = page_zone(page);
 
+	// 清理内存页 page 的无关属性
 	if (!free_pages_prepare(page, order, true, fpi_flags))
 		return;
 
+	// 获取页面迁移类型(从pageblock获取)
 	migratetype = get_pfnblock_migratetype(page, pfn);
 
 	spin_lock_irqsave(&zone->lock, flags);
@@ -1658,6 +1684,8 @@ static void __free_pages_ok(struct page *page, unsigned int order,
 		is_migrate_isolate(migratetype))) {
 		migratetype = get_pfnblock_migratetype(page, pfn);
 	}
+
+	// 释放内存
 	__free_one_page(page, pfn, zone, order, migratetype, fpi_flags);
 	spin_unlock_irqrestore(&zone->lock, flags);
 
@@ -2527,6 +2555,8 @@ static inline struct page *__rmqueue_cma_fallback(struct zone *zone,
  * Move the free pages in a range to the freelist tail of the requested type.
  * Note that start_page and end_pages are not aligned on a pageblock
  * boundary. If alignment is required, use move_freepages_block()
+ * 
+ * 把free page都移到migratetype所在队列的末尾
  */
 static int move_freepages(struct zone *zone,
 			  unsigned long start_pfn, unsigned long end_pfn,
@@ -2539,11 +2569,13 @@ static int move_freepages(struct zone *zone,
 
 	for (pfn = start_pfn; pfn <= end_pfn;) {
 		page = pfn_to_page(pfn);
-		if (!PageBuddy(page)) {
+		if (!PageBuddy(page)) { // 若page不是伙伴页的首页
 			/*
 			 * We assume that pages that could be isolated for
 			 * migration are movable. But we don't actually try
 			 * isolating, as that would be expensive.
+			 * 
+			 * 对于已经分配的LRU和Movable页增加num_movable
 			 */
 			if (num_movable &&
 					(PageLRU(page) || __PageMovable(page)))
@@ -2556,7 +2588,11 @@ static int move_freepages(struct zone *zone,
 		VM_BUG_ON_PAGE(page_to_nid(page) != zone_to_nid(zone), page);
 		VM_BUG_ON_PAGE(page_zone(page) != zone, page);
 
+		/* 此时的page均属于伙伴系统管理 */
+
 		order = buddy_order(page);
+
+		// 把当前page(和它的伙伴页)移到migratetype所在的free_list(order可变)
 		move_to_free_list(page, zone, order, migratetype);
 		pfn += 1 << order;
 		pages_moved += 1 << order;
@@ -2631,6 +2667,7 @@ static bool can_steal_fallback(unsigned int order, int start_mt)
 	return false;
 }
 
+// 提高水位线
 static inline bool boost_watermark(struct zone *zone)
 {
 	unsigned long max_boost;
@@ -2683,16 +2720,24 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 	int free_pages, movable_pages, alike_pages;
 	int old_block_type;
 
+	// 保存页块的原迁移类型
 	old_block_type = get_pageblock_migratetype(page);
 
 	/*
 	 * This can happen due to races and we want to prevent broken
 	 * highatomic accounting.
+	 * 
+	 * 若页块是紧急内存分配的页，则不能改变迁移类型
 	 */
 	if (is_migrate_highatomic(old_block_type))
 		goto single_page;
 
-	/* Take ownership for orders >= pageblock_order */
+	/** Take ownership for orders >= pageblock_order
+	 * 
+	 * 如果选定的页块大于pageblock_order(MAX_ORDER – 1)就改变整页块的迁移类型
+	 * 迁移类型设置的大小为pageblock_order
+	 * change_pageblock_range改变多个pageblock_order的迁移类型
+	 */
 	if (current_order >= pageblock_order) {
 		change_pageblock_range(page, current_order, start_type);
 		goto single_page;
@@ -2702,6 +2747,8 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 	 * Boost watermarks to increase reclaim pressure to reduce the
 	 * likelihood of future fallbacks. Wake kswapd now as the node
 	 * may be balanced overall and kswapd will not wake naturally.
+	 * 
+	 * 设置kswap启动标志位
 	 */
 	if (boost_watermark(zone) && (alloc_flags & ALLOC_KSWAPD))
 		set_bit(ZONE_BOOSTED_WATERMARK, &zone->flags);
@@ -2709,13 +2756,23 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 	/* We are not allowed to try stealing from the whole block */
 	if (!whole_block)
 		goto single_page;
-
+	
+	/**
+	 * 将page的start_pfn以pageblock_nr_pages对齐(可能多出来一部分页)
+	 * 多出来的页中，
+	 * 若不是伙伴页首页且是(已分配的LRU或Movable页)，则movable_pages++
+	 * 若是伙伴页首页，则free_pages += 伙伴页
+	 * movable_pages是已分配的可移动的兼容页
+	*/
 	free_pages = move_freepages_block(zone, page, start_type,
 						&movable_pages);
 	/*
 	 * Determine how many pages are compatible with our allocation.
 	 * For movable allocation, it's the number of movable pages which
 	 * we just obtained. For other types it's a bit more tricky.
+	 * 
+	 * 计算当前申请类型的已分配页框大概数目
+	 * alike_pages为与类型start_type兼容的页的数量
 	 */
 	if (start_type == MIGRATE_MOVABLE) {
 		alike_pages = movable_pages;
@@ -2726,6 +2783,9 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 		 * compatible. If it's UNMOVABLE falling back to RECLAIMABLE or
 		 * vice versa, be conservative since we can't distinguish the
 		 * exact migratetype of non-movable pages.
+		 * 
+		 * 如果要申请迁移类型是不可移动的，老的页框是可移动属性
+		 * 把所有不可移动的页框当作兼容的alike页框
 		 */
 		if (old_block_type == MIGRATE_MOVABLE)
 			alike_pages = pageblock_nr_pages
@@ -2734,13 +2794,17 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 			alike_pages = 0;
 	}
 
-	/* moving whole block can fail due to zone boundary conditions */
+	/** moving whole block can fail due to zone boundary conditions
+	 * 页块跨越了zone边界可能出现free_pages为0，这种情况不能改变页块的迁移类型
+	 */
 	if (!free_pages)
 		goto single_page;
 
 	/*
 	 * If a sufficient number of pages in the block are either free or of
 	 * comparable migratability as our allocation, claim the whole block.
+	 * 
+	 * 如果空闲页和类型兼容页数量和大于整个页块的一半就改变整个页块的迁移类型
 	 */
 	if (free_pages + alike_pages >= (1 << (pageblock_order-1)) ||
 			page_group_by_mobility_disabled)
@@ -2749,6 +2813,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 	return;
 
 single_page:
+	//将页块从之前的迁移类型列表中移动到迁移类型为start_type的列表中
 	move_to_free_list(page, zone, current_order, start_type);
 }
 
@@ -2907,7 +2972,8 @@ static bool unreserve_highatomic_pageblock(const struct alloc_context *ac,
 	return false;
 }
 
-/*
+/* 按fallback顺序将空闲页块迁移到指定migratetype链表上
+ *
  * Try finding a free buddy page on the fallback list and put it on the free
  * list of requested migratetype, possibly along with other pages from the same
  * block, depending on fragmentation avoidance heuristics. Returns true if
@@ -2921,17 +2987,25 @@ static __always_inline bool
 __rmqueue_fallback(struct zone *zone, int order, int start_migratetype,
 						unsigned int alloc_flags)
 {
+	// 最终选定的free area
 	struct free_area *area;
+
 	int current_order;
 	int min_order = order;
 	struct page *page;
+
+	// 最终的迁移类型
 	int fallback_mt;
+
 	bool can_steal;
 
 	/*
 	 * Do not steal pages from freelists belonging to other pageblocks
 	 * i.e. orders < pageblock_order. If there are no local zones free,
 	 * the zonelists will be reiterated without ALLOC_NOFRAGMENT.
+	 * 
+	 * 若设置了 ALLOC_NOFRAGMENT 即不希望引入内存碎片
+	 * 内核倾向于分配一个尽可能大的内存块
 	 */
 	if (alloc_flags & ALLOC_NOFRAGMENT)
 		min_order = pageblock_order;
@@ -2944,6 +3018,8 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype,
 	for (current_order = MAX_ORDER - 1; current_order >= min_order;
 				--current_order) {
 		area = &(zone->free_area[current_order]);
+
+		// 查找最合适的迁移类型
 		fallback_mt = find_suitable_fallback(area, current_order,
 				start_migratetype, false, &can_steal);
 		if (fallback_mt == -1)
@@ -2956,6 +3032,12 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype,
 		 * largest available page, because even if the next movable
 		 * allocation falls back into a different pageblock than this
 		 * one, it won't cause permanent fragmentation.
+		 * 
+		 * can_steal 会在 find_suitable_fallback 的过程中被设置
+		 * 当页面迁移类型为 MIGRATE_MOVABLE 且无法从其他 fallback 迁移类型列表中窃取页面时
+		 * 内核会更加倾向于 fallback 分配最小的可用页面，即尺寸和指定order最接近的页面数量而不是尺寸最大的
+		 * 因为这里的条件是分配可移动的页面类型，天然可以避免永久内存碎片，无需按照最大的尺寸分配
+		 * 
 		 */
 		if (!can_steal && start_migratetype == MIGRATE_MOVABLE
 					&& current_order > order)
@@ -2983,8 +3065,10 @@ find_smallest:
 	VM_BUG_ON(current_order == MAX_ORDER);
 
 do_steal:
+	// 从上述流程获取到的伙伴系统 free_area 中获取 free_list[fallback_mt]
 	page = get_page_from_free_area(area, fallback_mt);
 
+	// 从 free_list[fallback_mt] 中窃取页面到 free_list[start_migratetype] 中
 	steal_suitable_fallback(zone, page, alloc_flags, start_migratetype,
 								can_steal);
 
@@ -3010,6 +3094,8 @@ __rmqueue(struct zone *zone, unsigned int order, int migratetype,
 		 * Balance movable allocations between regular and CMA areas by
 		 * allocating from CMA when over half of the zone's free memory
 		 * is in the CMA area.
+		 * 
+		 * 当可以从CMA区域分配时，仍然需要平衡普通区域和CMA区域的分配情况
 		 */
 		if (alloc_flags & ALLOC_CMA &&
 		    zone_page_state(zone, NR_FREE_CMA_PAGES) >
@@ -3021,10 +3107,13 @@ __rmqueue(struct zone *zone, unsigned int order, int migratetype,
 	}
 retry:
 	page = __rmqueue_smallest(zone, order, migratetype);
+
+	// 伙伴系统中没有足够指定迁移类型 migratetype 的空闲内存块
 	if (unlikely(!page)) {
 		if (alloc_flags & ALLOC_CMA)
 			page = __rmqueue_cma_fallback(zone, order);
-
+		
+		// 常规的伙伴系统 fallback 流程
 		if (!page && __rmqueue_fallback(zone, order, migratetype,
 								alloc_flags))
 			goto retry;
@@ -3400,14 +3489,22 @@ static void free_unref_page_commit(struct page *page, unsigned long pfn,
 	int pindex;
 
 	__count_vm_event(PGFREE);
+
+	// 获取运行当前进程的 CPU 高速缓存列表 pcplist
 	pcp = this_cpu_ptr(zone->per_cpu_pageset);
 	pindex = order_to_pindex(migratetype, order);
+
+	// 将要释放的物理内存页添加到 pcplist 中
 	list_add(&page->lru, &pcp->lists[pindex]);
+
+	// pcplist 页面计数加一
 	pcp->count += 1 << order;
+
 	high = nr_pcp_high(pcp, zone);
+
+	// 如果 pcp 中的页面总数超过了 high 水位线，则将 pcp 中的 batch 个页面释放回伙伴系统中
 	if (pcp->count >= high) {
 		int batch = READ_ONCE(pcp->batch);
-
 		free_pcppages_bulk(zone, nr_pcp_free(pcp, high, batch), pcp);
 	}
 }
@@ -3431,12 +3528,14 @@ void free_unref_page(struct page *page, unsigned int order)
 	 * areas back if necessary. Otherwise, we may have to free
 	 * excessively into the page allocator
 	 */
-	migratetype = get_pcppage_migratetype(page);
+	migratetype = get_pcppage_migratetype(page); // 获取页面迁移类型
 	if (unlikely(migratetype >= MIGRATE_PCPTYPES)) {
 		if (unlikely(is_migrate_isolate(migratetype))) {
+			// 释放回伙伴系统
 			free_one_page(page_zone(page), page, pfn, order, migratetype, FPI_NONE);
 			return;
 		}
+		// 内核这里会将 HIGHATOMIC 类型页面当做 MIGRATE_MOVABLE 类型处理
 		migratetype = MIGRATE_MOVABLE;
 	}
 
@@ -5749,7 +5848,7 @@ void __free_pages(struct page *page, unsigned int order)
 
 	if (put_page_testzero(page))
 		free_the_page(page, order);
-	else if (!head)
+	else if (!head) // 当前page已经被其他进程使用，且不是复合Head页，释放其他页
 		while (order-- > 0)
 			free_the_page(page + (1 << order), order);
 }
