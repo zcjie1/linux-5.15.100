@@ -938,12 +938,12 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	char *after_dashes;
 
 	/*
-	* init_task是静态定义的一个进程，也就是说当内核被放入内存时，它就已经存在，它没有自己的用户空间，一直处于内核空间中运行，并* 且也只处于内核空间运行。0号进程用于包括内存、页表、必要数据结构、信号、调度器、硬件设备等的初始化。当它执行到最后（剩余初* 始化）时，将start_kernel中所有的初始化执行完成后，会在内核中启动一个kernel_init内核线程和一个kthreadd内核线程，kernel * init内核线程执行到最后会通过execve系统调用执行转变为我们所熟悉的init进程，而kthreadd内核线程是内核用于管理调度其他的内 * 核线程的守护线程。在最后init_task将变成一个idle进程，用于在CPU没有进程运行时运行它，它在此时仅仅用于空转。
+	* init_task是静态定义的一个进程，也就是说当内核被放入内存时，它就已经存在，它没有自己的用户空间，一直处于内核空间中运行，并* 且也只处于内核空间运行。0号进程用于包括内存、页表、必要数据结构、信号、调度器、硬件设备等的初始化。当它执行到最后（剩余初* 始化）时，将start_kernel中所有的初始化执行完成后，会在内核中启动一个kernel_init内核线程和一个kthreadd内核线程，kernel * init内核线程执行到最后会通过execve系统调用执行转变为我们所熟悉的init进程，而kthreadd内核线程是内核用于管理调度其他的内 * 核线程的守护线程。在最后init_task将变成一个idle进程(kswap进程)，用于在CPU没有进程运行时运行它，它在此时仅仅用于空转。
 	*/
 
 	// init_task（0号进程） 静态定义在 init/init_task.c中
 	// 获取栈底地址，并写入魔数（栈溢出检测）
-	set_task_stack_end_magic(&init_task); 
+	set_task_stack_end_magic(&init_task);
 	smp_setup_processor_id();
 	debug_objects_early_init();
 	init_vmlinux_build_id();
