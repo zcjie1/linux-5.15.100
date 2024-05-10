@@ -242,6 +242,7 @@ SECTIONS
 		*(.altinstr_aux)
 	}
 
+	/* initcall对应的section */
 	INIT_DATA_SECTION(16)
 
 	.x86_cpu_dev.init : AT(ADDR(.x86_cpu_dev.init) - LOAD_OFFSET) {

@@ -100,6 +100,7 @@ SYM_CODE_END(startup_64)
 SYM_CODE_START(secondary_startup_64)
 	UNWIND_HINT_EMPTY
 	/*
+	 * Linux内核启动入口
 	 * At this point the CPU runs in 64bit mode CS.L = 1 CS.D = 0,
 	 * and someone has loaded a mapped page table.
 	 *
