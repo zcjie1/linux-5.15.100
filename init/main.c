@@ -1039,7 +1039,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	context_tracking_init();
 	/* init some links before init_ISA_irqs() */
 	early_irq_init();
-	init_IRQ();
+	init_IRQ(); // 中断向量表条目设置
 	tick_init();
 	rcu_init_nohz();
 	init_timers();

@@ -362,6 +362,7 @@ SYM_CODE_END(xen_error_entry)
 .endm
 
 /**
+ * 生成IDT处理程序的入口，即asm_xxx()函数
  * idtentry - Macro to generate entry stubs for simple IDT entries
  * @vector:		Vector number
  * @asmsym:		ASM symbol for the entry point

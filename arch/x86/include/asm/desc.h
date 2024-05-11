@@ -210,6 +210,7 @@ static inline void native_load_gdt(const struct desc_ptr *dtr)
 	asm volatile("lgdt %0"::"m" (*dtr));
 }
 
+/* 加载IDTR寄存器 */
 static __always_inline void native_load_idt(const struct desc_ptr *dtr)
 {
 	asm volatile("lidt %0"::"m" (*dtr));

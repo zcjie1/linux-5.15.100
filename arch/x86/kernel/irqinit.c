@@ -82,8 +82,9 @@ void __init init_IRQ(void)
 	 * these IRQs are handled by more modern controllers like IO-APIC,
 	 * then this vector space can be freed and re-used dynamically as the
 	 * irq's migrate etc.
+	 * 
+	 * vector_irq即IRQ描述符表
 	 */
-	// vector_irq即IRQ描述符表
 	for (i = 0; i < nr_legacy_irqs(); i++)
 		per_cpu(vector_irq, 0)[ISA_IRQ_VECTOR(i)] = irq_to_desc(i);
 

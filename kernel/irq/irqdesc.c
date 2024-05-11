@@ -522,6 +522,10 @@ static int irq_expand_nr_irqs(unsigned int nr)
 	return 0;
 }
 
+/**
+ * 初始化irq_desc_tree
+ * 继而初始化vector_irq
+*/
 int __init early_irq_init(void)
 {
 	int i, initcnt, node = first_online_node;
@@ -544,6 +548,7 @@ int __init early_irq_init(void)
 		nr_irqs = initcnt;
 
 	for (i = 0; i < initcnt; i++) {
+		//在alloc_desc中对irq_desc的初始化会把handle_irq函数指针默认初始化为handle_bad_irq
 		desc = alloc_desc(i, node, 0, NULL, NULL);
 		set_bit(i, allocated_irqs);
 		irq_insert_desc(i, desc);

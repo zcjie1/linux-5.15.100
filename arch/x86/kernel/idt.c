@@ -27,11 +27,11 @@
 		.segment	= _segment,		\
 	}
 
-/* Interrupt gate 内核级描述符*/
+/* Interrupt gate 内核级中断描述符*/
 #define INTG(_vector, _addr)				\
 	G(_vector, _addr, DEFAULT_STACK, GATE_INTERRUPT, DPL0, __KERNEL_CS)
 
-/* System interrupt gate 用户级描述符*/
+/* System interrupt gate 用户级中断描述符*/
 #define SYSG(_vector, _addr)				\
 	G(_vector, _addr, DEFAULT_STACK, GATE_INTERRUPT, DPL3, __KERNEL_CS)
 
@@ -75,6 +75,9 @@ static const __initconst struct idt_data early_idts[] = {
  * cpu_init() is invoked. Interrupt stacks cannot be used at that point and
  * the traps which use them are reinitialized with IST after cpu_init() has
  * set up TSS.
+ * 
+ * 异常IDT表项
+ * 缺页异常单独设置, idt_setup_early_pf函数
  */
 static const __initconst struct idt_data def_idts[] = {
 	INTG(X86_TRAP_DE,		asm_exc_divide_error),
@@ -161,6 +164,7 @@ static const __initconst struct idt_data apic_idts[] = {
  * IDT表项对应的index为硬件中断号
  * 同时硬件中断号ID会映射到一个软件IRQ号
  * 通过IRQ号找到对应的处理函数
+ * IDT_ENTRIES = 256
 */
 static gate_desc idt_table[IDT_ENTRIES] __page_aligned_bss;
 
@@ -208,6 +212,8 @@ static __init void set_intr_gate(unsigned int n, const void *addr)
 
 /**
  * idt_setup_early_traps - Initialize the idt table with early traps
+ * 
+ * start_kernel中的首次IDT初始化
  *
  * On X8664 these traps do not use interrupt stacks as they can't work
  * before cpu_init() is invoked and sets up TSS. The IST variants are
@@ -278,8 +284,16 @@ void __init idt_setup_apic_and_irq_gates(void)
 	void *entry;
 
 	// 设置特定中断描述符项(如定时器中断，温度中断，IPI中断)
+	// IPI和per CPU的中断
 	idt_setup_from_table(idt_table, apic_idts, ARRAY_SIZE(apic_idts), true);
 
+	/**
+	 * 将剩余中断的入口都设置为irq_entries_start
+	 * irq_entries_start跳转到common_interrupt函数
+	 * common_interrupt函数会根据中断向量号去读取per CPU的数组变量vector_irq
+	 * 得到一个irq_desc
+	 * 最终调用irq_desc中的handle_irq
+	*/
 	for_each_clear_bit_from(i, system_vectors, FIRST_SYSTEM_VECTOR) {
 		entry = irq_entries_start + 8 * (i - FIRST_EXTERNAL_VECTOR);
 		set_intr_gate(i, entry);
