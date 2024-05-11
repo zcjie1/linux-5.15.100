@@ -714,6 +714,8 @@ static void __init early_reserve_memory(void)
 	 * __end_of_kernel_reserve symbols. Any kernel sections after the
 	 * __end_of_kernel_reserve symbol must be explicitly reserved with a
 	 * separate memblock_reserve() or they will be discarded.
+	 * 
+	 * _text代码段 ~ __end_of_kernel_reserve段 保留
 	 */
 	memblock_reserve(__pa_symbol(_text),
 			 (unsigned long)__end_of_kernel_reserve - (unsigned long)_text);
@@ -728,11 +730,15 @@ static void __init early_reserve_memory(void)
 	 *
 	 * In addition, make sure page 0 is always reserved because on
 	 * systems with L1TF its contents can be leaked to user processes.
+	 * 
+	 * 实模式1MB保留
 	 */
 	memblock_reserve(0, SZ_64K);
 
+	// initramfs保留
 	early_reserve_initrd();
 
+	// 反向映射setup data? 搞不懂
 	memblock_x86_reserve_range_setup_data();
 
 	reserve_ibft_region();
@@ -869,8 +875,11 @@ void __init setup_arch(char **cmdline_p)
 
 	if (!boot_params.hdr.root_flags)
 		root_mountflags &= ~MS_RDONLY;
+	
+	// mm_struct结构体初始化
 	setup_initial_init_mm(_text, _etext, _edata, (void *)_brk_end);
 
+	// 内存空间资源边界初始化
 	code_resource.start = __pa_symbol(_text);
 	code_resource.end = __pa_symbol(_etext)-1;
 	rodata_resource.start = __pa_symbol(__start_rodata);
@@ -1088,6 +1097,7 @@ void __init setup_arch(char **cmdline_p)
 
 	init_mem_mapping();
 
+	// 缺页异常处理函数初始化
 	idt_setup_early_pf();
 
 	/*
@@ -1142,7 +1152,9 @@ void __init setup_arch(char **cmdline_p)
 
 	early_acpi_boot_init();
 
+	// NUMA初始化
 	initmem_init();
+	
 	dma_contiguous_reserve(max_pfn_mapped << PAGE_SHIFT);
 
 	if (boot_cpu_has(X86_FEATURE_GBPAGES))

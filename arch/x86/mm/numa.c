@@ -22,6 +22,7 @@
 int numa_off;
 nodemask_t numa_nodes_parsed __initdata;
 
+// NUMA节点
 struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
 EXPORT_SYMBOL(node_data);
 
@@ -544,6 +545,7 @@ static void __init numa_clear_kernel_node_hotplug(void)
 	}
 }
 
+// 为每个NUMA node对应的struct pglist_data分配空间
 static int __init numa_register_memblks(struct numa_meminfo *mi)
 {
 	int i, nid;
@@ -554,6 +556,7 @@ static int __init numa_register_memblks(struct numa_meminfo *mi)
 	if (WARN_ON(nodes_empty(node_possible_map)))
 		return -EINVAL;
 
+	// 根据 numa_memblk 为每个内存区域设置 NUMA id
 	for (i = 0; i < mi->nr_blks; i++) {
 		struct numa_memblk *mb = &mi->blk[i];
 		memblock_set_node(mb->start, mb->end - mb->start,
@@ -608,6 +611,7 @@ static int __init numa_register_memblks(struct numa_meminfo *mi)
 		if (end && (end - start) < NODE_MIN_SIZE)
 			continue;
 
+		// 分配struct pglist_data空间
 		alloc_node_data(nid);
 	}
 
@@ -636,6 +640,7 @@ static void __init numa_init_array(void)
 	}
 }
 
+// NUMA节点struct pglist_data初始化
 static int __init numa_init(int (*init_func)(void))
 {
 	int i;

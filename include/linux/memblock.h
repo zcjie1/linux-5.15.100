@@ -49,11 +49,11 @@ enum memblock_flags {
  * @nid: NUMA node id
  */
 struct memblock_region {
-	phys_addr_t base;
-	phys_addr_t size;
-	enum memblock_flags flags;
+	phys_addr_t base; // 内存区域初始地址
+	phys_addr_t size; // 内存区域size
+	enum memblock_flags flags; // 内存区域属性
 #ifdef CONFIG_NUMA
-	int nid;
+	int nid; // NUMA节点号
 #endif
 };
 
@@ -66,10 +66,10 @@ struct memblock_region {
  * @name: the memory type symbolic name
  */
 struct memblock_type {
-	unsigned long cnt;
-	unsigned long max; 
-	phys_addr_t total_size; 
-	struct memblock_region *regions;
+	unsigned long cnt; // 当前集合中记录的内存区域个数
+	unsigned long max; // 当前集合中可记录的内存区域的最大个数
+	phys_addr_t total_size; // 内存区域总size
+	struct memblock_region *regions; // 内存区域结构指针
 	char *name;
 };
 
@@ -86,9 +86,9 @@ struct memblock {
 	 * false:也就是top-down,从高地址向地址分配内存.
 	*/
 	bool bottom_up;  /* is bottom up direction? */
-	phys_addr_t current_limit;
+	phys_addr_t current_limit; // 当前内存块的大小限制, 用于限制memblock_alloc的内存申请
 	struct memblock_type memory; // 可用内存的集合
-	struct memblock_type reserved;
+	struct memblock_type reserved; // 已分配内存的集合
 };
 
 extern struct memblock memblock;

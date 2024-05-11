@@ -5,6 +5,7 @@
 #define KERN_SOH	"\001"		/* ASCII Start Of Header */
 #define KERN_SOH_ASCII	'\001'
 
+/* printk消息等级 */
 #define KERN_EMERG	KERN_SOH "0"	/* system is unusable */
 #define KERN_ALERT	KERN_SOH "1"	/* action must be taken immediately */
 #define KERN_CRIT	KERN_SOH "2"	/* critical conditions */

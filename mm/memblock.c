@@ -102,12 +102,14 @@ unsigned long min_low_pfn;
 unsigned long max_pfn;
 unsigned long long max_possible_pfn;
 
+// 初始memblock内存区域，上限128
 static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
 static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_RESERVED_REGIONS] __initdata_memblock;
 #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
 static struct memblock_region memblock_physmem_init_regions[INIT_PHYSMEM_REGIONS];
 #endif
 
+// 初始memblock管理结构
 struct memblock memblock __initdata_memblock = {
 	.memory.regions		= memblock_memory_init_regions,
 	.memory.cnt		= 1,	/* empty dummy entry */
@@ -495,6 +497,9 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 
 /**
  * memblock_merge_regions - merge neighboring compatible regions
+ * 
+ * 合并相邻内存区域(pre_tail = next_head)
+ * 
  * @type: memblock type to scan
  *
  * Scan @type and merge neighboring compatible regions.
@@ -542,9 +547,11 @@ static void __init_memblock memblock_insert_region(struct memblock_type *type,
 						   int nid,
 						   enum memblock_flags flags)
 {
-	struct memblock_region *rgn = &type->regions[idx];
+	struct memblock_region *rgn = &type->regions[idx]; // 定位原内存区域
 
 	BUG_ON(type->cnt >= type->max);
+
+	// 将原内存区域及之后的区域全部向后移动一格
 	memmove(rgn + 1, rgn, (type->cnt - idx) * sizeof(*rgn));
 	rgn->base = base;
 	rgn->size = size;
@@ -583,7 +590,7 @@ static int __init_memblock memblock_add_range(struct memblock_type *type,
 	if (!size)
 		return 0;
 
-	/* special case for empty array */
+	/* special case for empty array——memblock_type中还未有内存区域 */
 	if (type->regions[0].size == 0) {
 		WARN_ON(type->cnt != 1 || type->total_size);
 		type->regions[0].base = base;
@@ -600,21 +607,22 @@ repeat:
 	 * to accommodate the new area.  The second actually inserts them.
 	 */
 	base = obase;
-	nr_new = 0;
+	nr_new = 0; // 待加入内存区域跨越了几个已加入内存区域(不包含第一个)
 
+	// 选出未被已存在区域覆盖的内存范围，并把新的内存范围作为新的内存区域插入
 	for_each_memblock_type(idx, type, rgn) {
 		phys_addr_t rbase = rgn->base;
 		phys_addr_t rend = rbase + rgn->size;
 
-		if (rbase >= end)
+		if (rbase >= end) // 所选内存区域完全超过待加入内存
 			break;
-		if (rend <= base)
+		if (rend <= base) // 所选内存区域完全落后待加入内存
 			continue;
 		/*
 		 * @rgn overlaps.  If it separates the lower part of new
 		 * area, insert that portion.
 		 */
-		if (rbase > base) {
+		if (rbase > base) { // 若所选内存区域起始点超过待加入内存
 #ifdef CONFIG_NUMA
 			WARN_ON(nid != memblock_get_region_node(rgn));
 #endif

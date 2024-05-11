@@ -959,7 +959,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	 */
 	boot_cpu_init();
 	page_address_init();
-	pr_notice("%s", linux_banner);
+	pr_notice("I am linux_banner: %s", linux_banner);
 	early_security_init();
 	setup_arch(&command_line);
 	setup_boot_config();

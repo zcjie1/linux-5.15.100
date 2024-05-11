@@ -280,6 +280,8 @@ static void setup_pcid(void)
 		 *
 		 * Instead, we brute-force it and set CR4.PCIDE manually in
 		 * start_secondary().
+		 * 
+		 * Enables process-context identifiers
 		 */
 		cr4_set_bits(X86_CR4_PCIDE);
 
@@ -736,6 +738,8 @@ void __init init_mem_mapping(void)
 	unsigned long end;
 
 	pti_check_boottime_disable();
+
+	// page_size掩码初始化
 	probe_page_size_mask();
 	setup_pcid();
 
@@ -745,7 +749,9 @@ void __init init_mem_mapping(void)
 	end = max_low_pfn << PAGE_SHIFT;
 #endif
 
-	/* the ISA range is always mapped regardless of memory holes */
+	/** the ISA range is always mapped regardless of memory holes
+	 * 增加页表项映射0到1M内存
+	 */
 	init_memory_mapping(0, ISA_END_ADDRESS, PAGE_KERNEL);
 
 	/* Init the trampoline, possibly with KASLR memory offset */
@@ -780,6 +786,7 @@ void __init init_mem_mapping(void)
 	early_ioremap_page_table_range_init();
 #endif
 
+	// 刷新页表
 	load_cr3(swapper_pg_dir);
 	__flush_tlb_all();
 
