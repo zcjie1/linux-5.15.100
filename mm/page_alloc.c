@@ -1590,6 +1590,7 @@ static void free_one_page(struct zone *zone,
 	spin_unlock_irqrestore(&zone->lock, flags);
 }
 
+// 初始化struct page
 static void __meminit __init_single_page(struct page *page, unsigned long pfn,
 				unsigned long zone, int nid)
 {
@@ -6954,6 +6955,9 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 		 * Usually, we want to mark the pageblock MIGRATE_MOVABLE,
 		 * such that unmovable allocations won't be scattered all
 		 * over the place during system boot.
+		 * 
+		 * struct page初始化耗时较久
+		 * 每初始化一个pageblock的量，试图调度一次
 		 */
 		if (IS_ALIGNED(pfn, pageblock_nr_pages)) {
 			set_pageblock_migratetype(page, migratetype);
@@ -7041,7 +7045,9 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 	}
 }
 
-/*
+/**
+ * 初始化由于各种原因遗漏的struct page
+ * 
  * Only struct pages that correspond to ranges defined by memblock.memory
  * are zeroed and initialized by going through __init_single_page() during
  * memmap_init_zone_range().
@@ -7110,6 +7116,7 @@ static void __init memmap_init_zone_range(struct zone *zone,
 	*hole_pfn = end_pfn;
 }
 
+// 初始化struct page
 static void __init memmap_init(void)
 {
 	unsigned long start_pfn, end_pfn;
@@ -7410,6 +7417,7 @@ static __meminit void zone_pcp_init(struct zone *zone)
 			 zone->present_pages, zone_batchsize(zone));
 }
 
+// 更新pgdat->nr_zones，初始化zone->free_area
 void __meminit init_currently_empty_zone(struct zone *zone,
 					unsigned long zone_start_pfn,
 					unsigned long size)
@@ -7639,6 +7647,7 @@ static unsigned long __init zone_absent_pages_in_node(int nid,
 	return nr_absent;
 }
 
+// 计算node中每个zone的spanned_pages和present_pages
 static void __init calculate_node_totalpages(struct pglist_data *pgdat,
 						unsigned long node_start_pfn,
 						unsigned long node_end_pfn)
@@ -7854,6 +7863,9 @@ void __ref free_area_init_core_hotplug(int nid)
  *
  * NOTE: pgdat should get zeroed by caller.
  * NOTE: this function is only called during early init.
+ * 
+ * 遍历zone，初始化，并计算managed_pages
+ * managed_pages在present_pages的基础上去掉了mem_map（存放struct page）和DMA预留空间
  */
 static void __init free_area_init_core(struct pglist_data *pgdat)
 {
@@ -7874,11 +7886,14 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		 * Adjust freesize so that it accounts for how much memory
 		 * is used by this zone for memmap. This affects the watermark
 		 * and per-cpu initialisations
+		 * 
+		 * 存放struct page所需的页数
 		 */
 		memmap_pages = calc_memmap_size(size, freesize);
+
 		if (!is_highmem_idx(j)) {
 			if (freesize >= memmap_pages) {
-				freesize -= memmap_pages;
+				freesize -= memmap_pages; // present_pages减去struct page所占空间
 				if (memmap_pages)
 					pr_debug("  %s zone: %lu pages used for memmap\n",
 						 zone_names[j], memmap_pages);
@@ -7889,12 +7904,12 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 
 		/* Account for reserved pages */
 		if (j == 0 && freesize > dma_reserve) {
-			freesize -= dma_reserve;
+			freesize -= dma_reserve; // present_pages减去DMA预留空间
 			pr_debug("  %s zone: %lu pages reserved\n", zone_names[0], dma_reserve);
 		}
 
 		if (!is_highmem_idx(j))
-			nr_kernel_pages += freesize;
+			nr_kernel_pages += freesize; // 剩下的managed_pages加入nr_kernel_pages
 		/* Charge for highmem memmap if there are enough kernel pages */
 		else if (nr_kernel_pages > memmap_pages * 2)
 			nr_kernel_pages -= memmap_pages;
@@ -7904,6 +7919,8 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		 * Set an approximate value for lowmem here, it will be adjusted
 		 * when the bootmem allocator frees pages into the buddy system.
 		 * And all highmem pages will be managed by the buddy system.
+		 * 
+		 * zone初始化
 		 */
 		zone_init_internals(zone, j, nid, freesize);
 
@@ -7984,6 +8001,7 @@ static void __init free_area_init_node(int nid)
 	/* pg_data_t should be reset to zero when it's allocated */
 	WARN_ON(pgdat->nr_zones || pgdat->kswapd_highest_zoneidx);
 
+	// 获取 nid 对应 NUMA节点 的 start_pfn 和 end_pfn
 	get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
 
 	pgdat->node_id = nid;
@@ -7993,11 +8011,14 @@ static void __init free_area_init_node(int nid)
 	pr_info("Initmem setup node %d [mem %#018Lx-%#018Lx]\n", nid,
 		(u64)start_pfn << PAGE_SHIFT,
 		end_pfn ? ((u64)end_pfn << PAGE_SHIFT) - 1 : 0);
+	
+	// 计算node下每个zone的spanned_pages和present_pages
 	calculate_node_totalpages(pgdat, start_pfn, end_pfn);
 
 	alloc_node_mem_map(pgdat);
 	pgdat_set_deferred_range(pgdat);
 
+	// 遍历zone，初始化，并计算managed_pages
 	free_area_init_core(pgdat);
 }
 
@@ -8354,7 +8375,7 @@ bool __weak arch_has_descending_max_zone_pfns(void)
  * This will call free_area_init_node() for each active node in the system.
  * Using the page ranges provided by memblock_set_node(), the size of each
  * zone in each node and their holes is calculated. If the maximum PFN
- * between two adjacent zones match, it is assumed that the zone is empty.
+ * between two adjacent(相邻) zones match, it is assumed that the zone is empty.
  * For example, if arch_max_dma_pfn == arch_max_dma32_pfn, it is assumed
  * that arch_max_dma32_pfn has no pages. It is also assumed that a zone
  * starts where the previous one ended. For example, ZONE_DMA32 starts
@@ -8375,6 +8396,7 @@ void __init free_area_init(unsigned long *max_zone_pfn)
 	start_pfn = find_min_pfn_with_active_regions();
 	descending = arch_has_descending_max_zone_pfns();
 
+	// 确定每个zone的pfn区间
 	for (i = 0; i < MAX_NR_ZONES; i++) {
 		if (descending)
 			zone = MAX_NR_ZONES - i - 1;
@@ -8424,6 +8446,8 @@ void __init free_area_init(unsigned long *max_zone_pfn)
 	 * Print out the early node map, and initialize the
 	 * subsection-map relative to active online memory ranges to
 	 * enable future "sub-section" extensions of the memory map.
+	 * 
+	 * 这里打印了由memblock给出的，每个node的pfn range分布。一个node可能对应多个pfn range
 	 */
 	pr_info("Early memory node ranges\n");
 	for_each_mem_pfn_range(i, MAX_NUMNODES, &start_pfn, &end_pfn, &nid) {
@@ -8438,6 +8462,8 @@ void __init free_area_init(unsigned long *max_zone_pfn)
 	setup_nr_node_ids();
 	for_each_online_node(nid) {
 		pg_data_t *pgdat = NODE_DATA(nid);
+
+		// 初始化每个NUMA节点
 		free_area_init_node(nid);
 
 		/* Any memory on that node */

@@ -1021,6 +1021,12 @@ void __init memblock_find_dma_reserve(void)
 #endif
 }
 
+
+/**
+ * 指定整个地址空间中每个zone的pfn上界
+ * 初始化每个zone的free_area
+ * 初始化struct page
+*/
 void __init zone_sizes_init(void)
 {
 	unsigned long max_zone_pfns[MAX_NR_ZONES];
