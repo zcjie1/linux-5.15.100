@@ -22,6 +22,8 @@
  * Permanent SPARSEMEM data:
  *
  * 1) mem_section	- memory sections, mem_map's for valid memory
+ * 
+ * SPARSEMEM 内存模型管理数据结构
  */
 #ifdef CONFIG_SPARSEMEM_EXTREME
 struct mem_section **mem_section;
@@ -81,7 +83,7 @@ static noinline struct mem_section __ref *sparse_index_alloc(int nid)
 
 static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 {
-	unsigned long root = SECTION_NR_TO_ROOT(section_nr);
+	unsigned long root = SECTION_NR_TO_ROOT(section_nr); // 获取section结构体所在的页index
 	struct mem_section *section;
 
 	/*
@@ -120,6 +122,7 @@ static inline unsigned long sparse_encode_early_nid(int nid)
 	return ((unsigned long)nid << SECTION_NID_SHIFT);
 }
 
+// 返回section的Node ID，初始NID被暂存在section_mem_map中
 static inline int sparse_early_nid(struct mem_section *section)
 {
 	return (section->section_mem_map >> SECTION_NID_SHIFT);
@@ -222,7 +225,12 @@ void __init subsection_map_init(unsigned long pfn, unsigned long nr_pages)
 }
 #endif
 
-/* Record a memory area against a node. */
+/** Record a memory area against a node.
+ * 为mem_section分配空间
+ * 为mem_section[root]分配空间
+ * 暂时用 section_mem_map 存储 NUMA ID
+ * 为 section_mem_map 打上 存在(present) 的标记
+ */
 static void __init memory_present(int nid, unsigned long start, unsigned long end)
 {
 	unsigned long pfn;
@@ -233,6 +241,8 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 
 		size = sizeof(struct mem_section *) * NR_SECTION_ROOTS;
 		align = 1 << (INTERNODE_CACHE_SHIFT);
+
+		// 为mem_section分配空间
 		mem_section = memblock_alloc(size, align);
 		if (!mem_section)
 			panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
@@ -240,19 +250,27 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 	}
 #endif
 
-	start &= PAGE_SECTION_MASK;
+	// 获取start所在的section的首pfn
+	start &= PAGE_SECTION_MASK; 
+
+	// 验证start和end的有效性
 	mminit_validate_memmodel_limits(&start, &end);
+
+
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
 		unsigned long section = pfn_to_section_nr(pfn);
 		struct mem_section *ms;
 
-		sparse_index_init(section, nid);
+		sparse_index_init(section, nid); // 为mem_section[root]分配空间
 		set_section_nid(section, nid);
 
 		ms = __nr_to_section(section);
-		if (!ms->section_mem_map) {
+
+		// 暂时用 section_mem_map 存储 NUMA ID
+		if (!ms->section_mem_map) { 
 			ms->section_mem_map = sparse_encode_early_nid(nid) |
 							SECTION_IS_ONLINE;
+			// 为 section_mem_map 打上存在(present)的标记
 			__section_mark_present(ms, section);
 		}
 	}
@@ -262,6 +280,9 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
  * Mark all memblocks as present using memory_present().
  * This is a convenience function that is useful to mark all of the systems
  * memory as present during initialization.
+ * 
+ * 初始化mem_section
+ * 选出region中的每个页，加入到mem_section管理中
  */
 static void __init memblocks_present(void)
 {
@@ -313,6 +334,7 @@ static unsigned long usemap_size(void)
 	return BITS_TO_LONGS(SECTION_BLOCKFLAGS_BITS) * sizeof(unsigned long);
 }
 
+// 单个section对应的pageblock所需的内存空间
 size_t mem_section_usage_size(void)
 {
 	return sizeof(struct mem_section_usage) + usemap_size();
@@ -415,6 +437,8 @@ static void __init check_usemap_section_nr(int nid,
 #endif /* CONFIG_MEMORY_HOTREMOVE */
 
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
+
+// 每个section对应的struct page所占的空间
 static unsigned long __init section_map_size(void)
 {
 	return ALIGN(sizeof(struct page) * PAGES_PER_SECTION, PMD_SIZE);
@@ -454,6 +478,7 @@ static inline void __meminit sparse_buffer_free(unsigned long size)
 	memblock_free_early(__pa(sparsemap_buf), size);
 }
 
+// 为struct page预先分配空间，用于__populate_section_memmap
 static void __init sparse_buffer_init(unsigned long size, int nid)
 {
 	phys_addr_t addr = __pa(MAX_DMA_ADDRESS);
@@ -501,6 +526,8 @@ void __weak __meminit vmemmap_populate_print_last(void)
 /*
  * Initialize sparse on a specific node. The node spans [pnum_begin, pnum_end)
  * And number of present sections in this node is map_count.
+ * 
+ * 初始化各个struct mem_section
  */
 static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 				   unsigned long pnum_end,
@@ -510,19 +537,25 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 	unsigned long pnum;
 	struct page *map;
 
+	// 从nid管理的内存中分配struct mem_section::usage所需空间
 	usage = sparse_early_usemaps_alloc_pgdat_section(NODE_DATA(nid),
 			mem_section_usage_size() * map_count);
 	if (!usage) {
 		pr_err("%s: node[%d] usemap allocation failed", __func__, nid);
 		goto failed;
 	}
+
+	// 为struct page预先分配空间
 	sparse_buffer_init(map_count * section_map_size(), nid);
+
+
 	for_each_present_section_nr(pnum_begin, pnum) {
 		unsigned long pfn = section_nr_to_pfn(pnum);
 
 		if (pnum >= pnum_end)
 			break;
 
+		// 为struct mem_section::section_mem_map分配空间
 		map = __populate_section_memmap(pfn, PAGES_PER_SECTION,
 				nid, NULL);
 		if (!map) {
@@ -533,8 +566,12 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 			goto failed;
 		}
 		check_usemap_section_nr(nid, usage);
+
+		// 初始化mem_section
 		sparse_init_one_section(__nr_to_section(pnum), pnum, map, usage,
 				SECTION_IS_EARLY);
+		
+		// 获取下一个section对应的usage地址
 		usage = (void *) usage + mem_section_usage_size();
 	}
 	sparse_buffer_fini();
@@ -554,6 +591,8 @@ failed:
 /*
  * Allocate the accumulated non-linear sections, allocate a mem_map
  * for each and record the physical to section mapping.
+ * 
+ * SPARSE内存模型初始化
  */
 void __init sparse_init(void)
 {
@@ -562,7 +601,7 @@ void __init sparse_init(void)
 
 	memblocks_present();
 
-	pnum_begin = first_present_section_nr();
+	pnum_begin = first_present_section_nr(); // 选出第一个存在section
 	nid_begin = sparse_early_nid(__nr_to_section(pnum_begin));
 
 	/* Setup pageblock_order for HUGETLB_PAGE_SIZE_VARIABLE */
@@ -575,8 +614,10 @@ void __init sparse_init(void)
 			map_count++;
 			continue;
 		}
-		/* Init node with sections in range [pnum_begin, pnum_end) */
-		sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count);
+		/** Init node with sections in range [pnum_begin, pnum_end)
+		 * 将属于同一个Node的section归属到一个Node下管理
+		 */
+		sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count); 
 		nid_begin = nid;
 		pnum_begin = pnum_end;
 		map_count = 1;

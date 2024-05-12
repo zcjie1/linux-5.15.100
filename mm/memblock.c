@@ -1200,8 +1200,11 @@ void __init_memblock __next_mem_range_rev(u64 *idx, int nid,
 	*idx = ULLONG_MAX;
 }
 
-/*
+/**
  * Common iterator interface used to define for_each_mem_pfn_range().
+ * 
+ * 输出完全处在一个region中的page range
+ * 不完全处于一个region: 一个page横跨多个region，或部分不在region中
  */
 void __init_memblock __next_mem_pfn_range(int *idx, int nid,
 				unsigned long *out_start_pfn,
@@ -1215,7 +1218,7 @@ void __init_memblock __next_mem_pfn_range(int *idx, int nid,
 		r = &type->regions[*idx];
 		r_nid = memblock_get_region_node(r);
 
-		if (PFN_UP(r->base) >= PFN_DOWN(r->base + r->size))
+		if (PFN_UP(r->base) >= PFN_DOWN(r->base + r->size)) // 当region只横跨两个page
 			continue;
 		if (nid == MAX_NUMNODES || nid == r_nid)
 			break;

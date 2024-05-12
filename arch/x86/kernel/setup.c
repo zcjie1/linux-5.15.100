@@ -1152,9 +1152,9 @@ void __init setup_arch(char **cmdline_p)
 
 	early_acpi_boot_init();
 
-	// NUMA初始化
+	// NUMA节点分配
 	initmem_init();
-	
+
 	dma_contiguous_reserve(max_pfn_mapped << PAGE_SHIFT);
 
 	if (boot_cpu_has(X86_FEATURE_GBPAGES))

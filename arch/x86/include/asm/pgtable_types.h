@@ -279,6 +279,7 @@ enum page_cache_mode {
 
 typedef struct pgprot { pgprotval_t pgprot; } pgprot_t;
 
+// Page Global Directory(页全局目录)
 typedef struct { pgdval_t pgd; } pgd_t;
 
 static inline pgprot_t pgprot_nx(pgprot_t prot)
@@ -326,6 +327,7 @@ static inline pgdval_t pgd_flags(pgd_t pgd)
 }
 
 #if CONFIG_PGTABLE_LEVELS > 4
+/* Page 4-Level Directory(4级页目录) */
 typedef struct { p4dval_t p4d; } p4d_t;
 
 static inline p4d_t native_make_p4d(pudval_t val)
@@ -352,6 +354,7 @@ static inline p4dval_t native_p4d_val(p4d_t p4d)
 #endif
 
 #if CONFIG_PGTABLE_LEVELS > 3
+/* Page Upper Directory(页三级目录, 页上级目录) */
 typedef struct { pudval_t pud; } pud_t;
 
 static inline pud_t native_make_pud(pmdval_t val)
@@ -378,6 +381,7 @@ static inline pudval_t native_pud_val(pud_t pud)
 #endif
 
 #if CONFIG_PGTABLE_LEVELS > 2
+/* Page Middle Directory(页二级目录, 页中级目录) */
 typedef struct { pmdval_t pmd; } pmd_t;
 
 static inline pmd_t native_make_pmd(pmdval_t val)

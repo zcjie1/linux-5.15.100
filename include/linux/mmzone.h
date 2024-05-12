@@ -1311,7 +1311,13 @@ void subsection_map_init(unsigned long pfn, unsigned long nr_pages);
 struct page;
 struct page_ext;
 struct mem_section {
-	/*
+	/**
+	 * 指向section管理的连续内存page数组
+	 * 
+	 * 存储的不是mem_map的原始值，而是 (原始值) 减去 (mem_section在物理地址空间的偏移)
+	 * 目的是让struct page*指针与ms->section_mem_map作差时得到在整个物理地址空间中的pfn偏移量
+	 * 方便了__page_to_pfn()和__pfn_to_page()的实现
+	 * 
 	 * This is, logically, a pointer to an array of struct
 	 * pages.  However, it is stored with some other magic.
 	 * (see sparse.c::sparse_init_one_section())
@@ -1323,7 +1329,7 @@ struct mem_section {
 	 * Making it a UL at least makes someone do a cast
 	 * before using it wrong.
 	 */
-	unsigned long section_mem_map; // 指向section管理的连续内存page数组
+	unsigned long section_mem_map;
 
 	struct mem_section_usage *usage;
 #ifdef CONFIG_PAGE_EXTENSION
@@ -1347,6 +1353,8 @@ struct mem_section {
 #endif
 
 #define SECTION_NR_TO_ROOT(sec)	((sec) / SECTIONS_PER_ROOT)
+
+/* section所占的页数 */
 #define NR_SECTION_ROOTS	DIV_ROUND_UP(NR_MEM_SECTIONS, SECTIONS_PER_ROOT)
 #define SECTION_ROOT_MASK	(SECTIONS_PER_ROOT - 1)
 

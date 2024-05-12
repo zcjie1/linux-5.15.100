@@ -58,6 +58,8 @@ static __init void x86_wallclock_init(void)
 /*
  * The platform setup functions are preset with the default functions
  * for standard PC hardware.
+ * 
+ * x86初始化函数
  */
 struct x86_init_ops x86_init __initdata = {
 

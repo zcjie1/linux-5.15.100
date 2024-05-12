@@ -560,9 +560,11 @@ p4d_t * __meminit vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node)
 
 pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
 {
-	pgd_t *pgd = pgd_offset_k(addr);
+	pgd_t *pgd = pgd_offset_k(addr); // 获取addr对应的目录项
+
+	// 若目录项不存在
 	if (pgd_none(*pgd)) {
-		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node); // 分配空页作为4级目录，并初始化为0
 		if (!p)
 			return NULL;
 		pgd_populate(&init_mm, pgd, p);
@@ -580,6 +582,7 @@ int __meminit vmemmap_populate_basepages(unsigned long start, unsigned long end,
 	pmd_t *pmd;
 	pte_t *pte;
 
+	// 将从start开始的page映射到各级页表中
 	for (; addr < end; addr += PAGE_SIZE) {
 		pgd = vmemmap_pgd_populate(addr, node);
 		if (!pgd)
@@ -602,6 +605,7 @@ int __meminit vmemmap_populate_basepages(unsigned long start, unsigned long end,
 	return 0;
 }
 
+// 分配struct page结构体，并映射到vmemmap空间, 填充页表
 struct page * __meminit __populate_section_memmap(unsigned long pfn,
 		unsigned long nr_pages, int nid, struct vmem_altmap *altmap)
 {
