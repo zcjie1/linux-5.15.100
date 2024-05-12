@@ -820,8 +820,16 @@ typedef struct pglist_data {
 	 * node_zonelists contains references to all zones in all nodes.
 	 * Generally the first zones will be references to this node's
 	 * node_zones.
+	 * 
+	 * zone优先级列表
+	 * 
+	 * 第一个元素指向本节点，并按优先级顺序指向其它fallback node，
+	 * 当本节点不满足分配条件，则依次从fallback节点分配内存
+	 * 
+	 * 第二个元素表示指定节点分配
+	 * 若分配失败，则直接返回内存分配失败
 	 */
-	struct zonelist node_zonelists[MAX_ZONELISTS]; // NUMA 节点的备用列表
+	struct zonelist node_zonelists[MAX_ZONELISTS];
 
 	int nr_zones; /* number of populated zones in this node——NUMA节点中的物理内存区域个数*/
 #ifdef CONFIG_FLATMEM	/* means !SPARSEMEM */

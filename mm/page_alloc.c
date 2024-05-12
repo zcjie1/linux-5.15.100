@@ -6671,14 +6671,17 @@ static void build_zonelists(pg_data_t *pgdat)
 		 */
 		if (node_distance(local_node, node) !=
 		    node_distance(local_node, prev_node))
-			node_load[node] = load;
+			node_load[node] = load; // 用于find_next_best_node
 
 		node_order[nr_nodes++] = node;
 		prev_node = node;
 		load--;
 	}
 
+	// 按node_order顺序获取每个node的zone，并按zone类型重要程度排列，将zone依次加入zonelist列表
 	build_zonelists_in_node_order(pgdat, node_order, nr_nodes);
+
+	// 为numa建立不带fallback节点的zonelist分配列表
 	build_thisnode_zonelists(pgdat);
 }
 
@@ -6766,6 +6769,7 @@ static DEFINE_PER_CPU(struct per_cpu_pages, boot_pageset);
 static DEFINE_PER_CPU(struct per_cpu_zonestat, boot_zonestats);
 static DEFINE_PER_CPU(struct per_cpu_nodestat, boot_nodestats);
 
+// 遍历所有NUMA节点，分别建立zonelist
 static void __build_all_zonelists(void *data)
 {
 	int nid;
@@ -6827,6 +6831,8 @@ build_all_zonelists_init(void)
 	 * F.e. the percpu allocator needs the page allocator which
 	 * needs the percpu allocator in order to allocate its pagesets
 	 * (a chicken-egg dilemma).
+	 * 
+	 * 初始化暂用的per_cpu_pageset和per_cpu_zonestats(zone的两个字段)
 	 */
 	for_each_possible_cpu(cpu)
 		per_cpu_pages_init(&per_cpu(boot_pageset, cpu), &per_cpu(boot_zonestats, cpu));
@@ -6837,6 +6843,7 @@ build_all_zonelists_init(void)
 
 /*
  * unless system_state == SYSTEM_BOOTING.
+ * 创建内存分配优先级zone列表
  *
  * __ref due to call of __init annotated helper build_all_zonelists_init
  * [protected by SYSTEM_BOOTING].
@@ -6859,6 +6866,8 @@ void __ref build_all_zonelists(pg_data_t *pgdat)
 	 * more accurate, but expensive to check per-zone. This check is
 	 * made on memory-hotadd so a system can start with mobility
 	 * disabled and enable it later
+	 * 
+	 * 若高于水位线的page数过少，则禁止页面移动
 	 */
 	if (vm_total_pages < (pageblock_nr_pages * MIGRATE_TYPES))
 		page_group_by_mobility_disabled = 1;

@@ -969,7 +969,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 	boot_cpu_hotplug_init();
 
-	build_all_zonelists(NULL);
+	build_all_zonelists(NULL); // 创建内存分配优先级zone列表
 	page_alloc_init();
 
 	pr_notice("Kernel command line: %s\n", saved_command_line);
