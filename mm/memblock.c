@@ -1065,7 +1065,13 @@ void __next_mem_range(u64 *idx, int nid, enum memblock_flags flags,
 			phys_addr_t r_end;
 
 			r = &type_b->regions[idx_b];
-			r_start = idx_b ? r[-1].base + r[-1].size : 0;
+
+			/**
+			 * r_start, r_end代表reserved_region间的空洞的起点和终点
+			*/
+			r_start = idx_b ? r[-1].base + r[-1].size : 0; //前一个reserved_region的末尾
+
+			// 后一个reserved.region的初始
 			r_end = idx_b < type_b->cnt ?
 				r->base : PHYS_ADDR_MAX;
 
