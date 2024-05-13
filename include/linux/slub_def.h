@@ -41,16 +41,20 @@ enum stat_item {
 	CPU_PARTIAL_DRAIN,	/* Drain cpu partial to node partial */
 	NR_SLUB_STAT_ITEMS };
 
-/*
+/* Slab Cache CPU本地缓存
  * When changing the layout, make sure freelist and tid are still compatible
  * with this_cpu_cmpxchg_double() alignment requirements.
  */
 struct kmem_cache_cpu {
+	// 指向被 CPU 本地缓存的 slab 中第一个空闲的对象
 	void **freelist;	/* Pointer to next available object */
+
+	// 确保kmem_cache_cpu 与当前执行进程的 cpu 是一致的
 	unsigned long tid;	/* Globally unique transaction id */
+
 	struct page *page;	/* The slab from which we are allocating */
 #ifdef CONFIG_SLUB_CPU_PARTIAL
-	struct page *partial;	/* Partially allocated frozen slabs */
+	struct page *partial;	/* 备用slab列表——Partially allocated frozen slabs */
 #endif
 	local_lock_t lock;	/* Protects the fields above */
 #ifdef CONFIG_SLUB_STATS
@@ -88,25 +92,62 @@ struct kmem_cache_order_objects {
  * Slab cache management.
  */
 struct kmem_cache {
+
+	// 每个 cpu 拥有一个本地缓存，用于无锁化快速分配释放对象
 	struct kmem_cache_cpu __percpu *cpu_slab;
+
 	/* Used for retrieving partial slabs, etc. */
+
+	/**
+	 * slab cache 的管理标志位，用于设置 slab 的一些特性
+	 * 比如：slab 中的对象按照什么方式对齐，对象是否需要POISON毒化,
+	 * 是否插入 red zone 在对象内存周围，是否追踪对象的分配和释放信息 等等
+	*/
 	slab_flags_t flags;
+
+	// kmem_cache_node中partial列表上slab数目限制(超过则回收empty slab)
 	unsigned long min_partial;
-	unsigned int size;	/* The size of an object including metadata */
-	unsigned int object_size;/* The size of an object without metadata */
+
+	/*
+	 * The size of an object including metadata
+	 * slab 对象在内存中的真实占用，包括为了内存对齐填充的字节数，red zone 等等
+	*/
+	unsigned int size;
+
+	// slab 中对象的实际大小，不包含填充的字节数
+	unsigned int object_size;
+
 	struct reciprocal_value reciprocal_size;
-	unsigned int offset;	/* Free pointer offset */
+
+	// 下一个空闲对象指针(Free pointer)的位置距离对象首地址的偏移(用于poison的情况)
+	unsigned int offset;
 #ifdef CONFIG_SLUB_CPU_PARTIAL
 	/* Number of per cpu partial objects to keep around */
 	unsigned int cpu_partial;
 #endif
+
+	/**
+	 * cache 中的 slab 大小，包括 slab 所需要申请的页面个数，以及所包含的对象个数
+	 * 低 16 位表示一个 slab 中所包含的对象总数
+	 * 高 16 位表示一个 slab 所占有的内存页个数
+	*/
 	struct kmem_cache_order_objects oo;
 
 	/* Allocation and freeing of slabs */
+
+	// slab 中所能包含对象以及内存页个数的最大值
 	struct kmem_cache_order_objects max;
+
+	 // 内存紧张时，采用 min 的尺寸为 slab 申请内存(而不是oo)
 	struct kmem_cache_order_objects min;
-	gfp_t allocflags;	/* gfp flags to use on each alloc */
-	int refcount;		/* Refcount for slab cache destroy */
+
+
+	gfp_t allocflags;	/* 伙伴系统申请内存分配标识——gfp flags to use on each alloc */
+
+	// slab cache 的引用计数，为 0 时就可以销毁并释放内存回伙伴系统重
+	int refcount;
+
+	// 池化对象的构造函数，用于创建 slab 对象池中的对象
 	void (*ctor)(void *);
 	unsigned int inuse;		/* Offset to metadata */
 	unsigned int align;		/* Alignment */

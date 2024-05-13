@@ -33,7 +33,10 @@
 #include "slab.h"
 
 enum slab_state slab_state;
+
+// slab_cache链表头节点
 LIST_HEAD(slab_caches);
+
 DEFINE_MUTEX(slab_mutex);
 struct kmem_cache *kmem_cache;
 
@@ -97,6 +100,9 @@ EXPORT_SYMBOL(kmem_cache_size);
 #ifdef CONFIG_DEBUG_VM
 static int kmem_cache_sanity_check(const char *name, unsigned int size)
 {
+	// 1: 传入 slab cache 的名称不能为空
+    // 2: 创建 slab cache 的过程不能处在中断上下文中
+    // 3: 传入的对象大小 size 需要在 8 字节到 KMALLOC_MAX_SIZE = 4M 之间
 	if (!name || in_interrupt() || size > KMALLOC_MAX_SIZE) {
 		pr_err("kmem_cache_create(%s) integrity check failed\n", name);
 		return -EINVAL;
@@ -139,7 +145,7 @@ int __kmem_cache_alloc_bulk(struct kmem_cache *s, gfp_t flags, size_t nr,
 	return i;
 }
 
-/*
+/* 计算对齐字节
  * Figure out what the alignment of the objects will be given a set of
  * flags, a user specified alignment and the size of the objects.
  */
@@ -327,14 +333,18 @@ kmem_cache_create_usercopy(const char *name,
 		static_branch_enable(&slub_debug_enabled);
 #endif
 
+	// 获取 slab cache 链表的全局互斥锁
 	mutex_lock(&slab_mutex);
 
+	// 入参检查，校验 name 和 size 的有效性，防止创建过程在中断上下文中进行
 	err = kmem_cache_sanity_check(name, size);
 	if (err) {
 		goto out_unlock;
 	}
 
-	/* Refuse requests with allocator specific flags */
+	/** Refuse requests with allocator specific flags
+	 * 检查有效的 slab flags 标记位，如果传入的 flag 是无效的，则拒绝本次创建请求
+	 */
 	if (flags & ~SLAB_FLAGS_PERMITTED) {
 		err = -EINVAL;
 		goto out_unlock;
@@ -345,25 +355,39 @@ kmem_cache_create_usercopy(const char *name,
 	 * of all flags. We expect them to define CACHE_CREATE_MASK in this
 	 * case, and we'll just provide them with a sanitized version of the
 	 * passed flags.
+	 * 
+	 * 限制标志位，适应内核分配器
 	 */
 	flags &= CACHE_CREATE_MASK;
 
-	/* Fail closed on bad usersize of useroffset values. */
+	/** Fail closed on bad usersize of useroffset values.
+	 * 校验 useroffset 和 usersize 的有效性
+	 */
 	if (WARN_ON(!usersize && useroffset) ||
 	    WARN_ON(size < usersize || size - usersize < useroffset))
 		usersize = useroffset = 0;
 
 	if (!usersize)
+		/**
+		 * 在全局 slab cache 链表中查找与当前创建参数相匹配的 kmem_cache
+		 * 如果有，就不需要创建新的了，直接和已有的  slab cache  合并
+		 * 并且在 sysfs 中使用指定的 name 作为已有  slab cache  的别名
+		*/
 		s = __kmem_cache_alias(name, size, align, flags, ctor);
 	if (s)
 		goto out_unlock;
 
+	/**
+	 * 在内核中为指定的 name 生成字符串常量并分配内存
+	 * cache_name 就是将要创建的 slab cache 名称，用于在 /proc/slabinfo 中显示
+	*/
 	cache_name = kstrdup_const(name, GFP_KERNEL);
 	if (!cache_name) {
 		err = -ENOMEM;
 		goto out_unlock;
 	}
 
+	// 创建新的 slab cache
 	s = create_cache(cache_name, size,
 			 calculate_alignment(flags, align, size),
 			 flags, useroffset, usersize, ctor, NULL);
@@ -391,7 +415,7 @@ out_unlock:
 EXPORT_SYMBOL(kmem_cache_create_usercopy);
 
 /**
- * kmem_cache_create - Create a cache.
+ * kmem_cache_create - Create a cache. slab内存池创建
  * @name: A string which is used in /proc/slabinfo to identify this cache.
  * @size: The size of objects to be created in this cache.
  * @align: The required alignment for the objects.

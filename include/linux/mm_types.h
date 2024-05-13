@@ -67,6 +67,7 @@ struct mem_cgroup;
 #define _struct_page_alignment
 #endif
 
+// struct page结构体
 struct page {
 	// 存储 page 的定位信息以及相关标志位
 	unsigned long flags;		/* Atomic flags, some possibly
@@ -152,15 +153,20 @@ struct page {
 #endif
 				};
 			};
-			struct kmem_cache *slab_cache; /* not slob 用于指向当前 page 所属的 slab 管理结构 */
-			/* Double-word boundary */
-			void *freelist;		/* first free object 指向 page 中的第一个未分配出去的空闲对象 */
+			struct kmem_cache *slab_cache; /* not slob 指向当前 page 所属的 slab 管理结构 */
+			/** 8 Double-word boundary
+			 * first free object 指向 page 中的第一个未分配出去的空闲对象
+			 * 当 slab 被缓存进 kmem_cache_cpu 中之后
+			 * page 结构中的 freelist 会赋值给 kmem_cache_cpu->freelist
+			 * 然后 page->freelist 置空，frozen置位
+			 */
+			void *freelist;
 			union {
 				void *s_mem;	/* slab: first object */
 				unsigned long counters;		/* SLUB */
 				struct {			/* SLUB */
-					unsigned inuse:16;
-					unsigned objects:15;
+					unsigned inuse:16; // 已分配的对象数
+					unsigned objects:15; // 对象总数
 
 					// 当前内存页 page 被 slab 放置在 CPU 本地缓存列表中，frozen = 1，否则 frozen = 0
 					unsigned frozen:1; 

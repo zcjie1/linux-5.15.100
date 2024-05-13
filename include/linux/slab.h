@@ -19,7 +19,7 @@
 #include <linux/percpu-refcount.h>
 
 
-/*
+/* kmem_cache标志位
  * Flags to pass to kmem_cache_create().
  * The ones marked DEBUG are only valid if CONFIG_DEBUG_SLAB is set.
  */

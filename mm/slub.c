@@ -4865,17 +4865,21 @@ __kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 {
 	struct kmem_cache *s;
 
+	// 寻找可合并的kmem_cache
 	s = find_mergeable(size, align, flags, name, ctor);
 	if (s) {
-		s->refcount++;
+		s->refcount++; // 增加引用计数
 
 		/*
 		 * Adjust the object sizes so that we clear
 		 * the complete object on kzalloc.
+		 * 
+		 * 采用较大的值，更新已有的 kmem_cache 相关的元数据
 		 */
 		s->object_size = max(s->object_size, size);
 		s->inuse = max(s->inuse, ALIGN(size, sizeof(void *)));
 
+		// sysfs输出kmem_cache别名, 创建新目录/sys/kernel/slab/name
 		if (sysfs_slab_alias(s, name)) {
 			s->refcount--;
 			s = NULL;
