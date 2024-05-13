@@ -87,8 +87,8 @@ struct memblock {
 	*/
 	bool bottom_up;  /* is bottom up direction? */
 	phys_addr_t current_limit; // 当前内存块的大小限制, 用于限制memblock_alloc的内存申请
-	struct memblock_type memory; // 可用内存的集合
-	struct memblock_type reserved; // 已分配内存的集合
+	struct memblock_type memory; // 可用内存的集合(包括已分配和未分配的)
+	struct memblock_type reserved; // 已分配内存的集合(比如内核image, dtb, 页表等)
 };
 
 extern struct memblock memblock;
@@ -260,6 +260,10 @@ void __next_mem_pfn_range(int *idx, int nid, unsigned long *out_start_pfn,
 
 /**
  * for_each_mem_pfn_range - early memory pfn range iterator
+ * 
+ * 从memblock.memory中取出完全处于一个region中的page, 
+ * 跨越多个region或部分不处于region中的page会略过
+ * 
  * @i: an integer used as loop variable
  * @nid: node selector, %MAX_NUMNODES for all nodes
  * @p_start: ptr to ulong for start pfn of the range, can be %NULL

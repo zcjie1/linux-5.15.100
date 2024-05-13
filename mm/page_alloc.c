@@ -7119,13 +7119,13 @@ static void __init memmap_init_zone_range(struct zone *zone,
 	memmap_init_range(end_pfn - start_pfn, nid, zone_id, start_pfn,
 			  zone_end_pfn, MEMINIT_EARLY, NULL, MIGRATE_MOVABLE);
 
-	if (*hole_pfn < start_pfn)
+	if (*hole_pfn < start_pfn) // 初始化跨多个region或部分不在region中的page
 		init_unavailable_range(*hole_pfn, start_pfn, zone_id, nid);
 
 	*hole_pfn = end_pfn;
 }
 
-// 初始化struct page
+// 初始化struct page, 但对内存空洞依然会创建struct page, 等待memblock_free_all函数释放
 static void __init memmap_init(void)
 {
 	unsigned long start_pfn, end_pfn;
@@ -8708,6 +8708,10 @@ static int __init set_hashdist(char *str)
 __setup("hashdist=", set_hashdist);
 #endif
 
+/**
+ * page_alloc_init函数用于注册cpu状态回调函数(page_alloc_cpu_online、page_alloc_cpu_dead)到热插拔线程结构
+ * 每个cpu都有自己的热插拔线程(cpuhp)用于状态检测、调用对应状态的函数
+*/
 void __init page_alloc_init(void)
 {
 	int ret;

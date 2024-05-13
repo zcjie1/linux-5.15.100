@@ -1075,7 +1075,9 @@ void __next_mem_range(u64 *idx, int nid, enum memblock_flags flags,
 			 */
 			if (r_start >= m_end)
 				break;
-			/* if the two regions intersect, we're done */
+			/** if the two regions intersect, we're done
+			 * 获取memblock.memory与memblcok.reserved重叠的区域并返回
+			 */
 			if (m_start < r_end) {
 				if (out_start)
 					*out_start =
@@ -1931,6 +1933,11 @@ static int __init early_memblock(char *p)
 }
 early_param("memblock", early_memblock);
 
+
+/**
+ * 释放start_pfn到end_pfn对应的struct page结构体所占空间
+ * 即从memblock.reserved中删除该部分struct page所占的内存空间
+*/
 static void __init free_memmap(unsigned long start_pfn, unsigned long end_pfn)
 {
 	struct page *start_pg, *end_pg;
@@ -1972,12 +1979,17 @@ static void __init free_unused_memmap(void)
 	/*
 	 * This relies on each bank being in address order.
 	 * The banks are sorted previously in bootmem_init().
+	 * 
+	 * 从memblock.memory中取出完全处于一个region中的page
+	 * 跨越多个region或部分不处于region中的page会略过
 	 */
 	for_each_mem_pfn_range(i, MAX_NUMNODES, &start, &end, NULL) {
 #ifdef CONFIG_SPARSEMEM
 		/*
 		 * Take care not to free memmap entries that don't exist
 		 * due to SPARSEMEM sections which aren't present.
+		 * 
+		 * ALIGN向上取整
 		 */
 		start = min(start, ALIGN(prev_end, PAGES_PER_SECTION));
 #endif
@@ -1985,12 +1997,16 @@ static void __init free_unused_memmap(void)
 		 * Align down here since many operations in VM subsystem
 		 * presume that there are no holes in the memory map inside
 		 * a pageblock
+		 * 
+		 * 假定pageblock中不存在空洞
 		 */
 		start = round_down(start, pageblock_nr_pages);
 
 		/*
 		 * If we had a previous bank, and there is a space
 		 * between the current bank and the previous, free it.
+		 * 
+		 * 两个region间存在空洞
 		 */
 		if (prev_end && prev_end < start)
 			free_memmap(prev_end, start);
@@ -2042,6 +2058,10 @@ static unsigned long __init __free_memory_core(phys_addr_t start,
 	return end_pfn - start_pfn;
 }
 
+/**
+ * 为memblock.reserved中的每个页置位Reserved标志位
+ * 为memblock.memory中每个MEMBLOCK_NOMAP的region页置位Reserved标志位
+*/
 static void __init memmap_init_reserved_pages(void)
 {
 	struct memblock_region *region;
@@ -2062,6 +2082,7 @@ static void __init memmap_init_reserved_pages(void)
 	}
 }
 
+// 返回free page数量
 static unsigned long __init free_low_memory_core_early(void)
 {
 	unsigned long count = 0;
@@ -2086,6 +2107,7 @@ static unsigned long __init free_low_memory_core_early(void)
 
 static int reset_managed_pages_done __initdata;
 
+// 重置(0)某个Node中所有zone的managed_pages
 void reset_node_managed_pages(pg_data_t *pgdat)
 {
 	struct zone *z;
@@ -2094,6 +2116,7 @@ void reset_node_managed_pages(pg_data_t *pgdat)
 		atomic_long_set(&z->managed_pages, 0);
 }
 
+// 重置(0)每个zone的managed_pages
 void __init reset_all_zones_managed_pages(void)
 {
 	struct pglist_data *pgdat;
@@ -2109,6 +2132,7 @@ void __init reset_all_zones_managed_pages(void)
 
 /**
  * memblock_free_all - release free pages to the buddy allocator
+ * 将free page从memblock传递给buddy系统
  */
 void __init memblock_free_all(void)
 {
@@ -2118,6 +2142,9 @@ void __init memblock_free_all(void)
 	reset_all_zones_managed_pages();
 
 	pages = free_low_memory_core_early();
+
+	pr_info("MemBlock ---> Buddy: %ld pages", pages);
+
 	totalram_pages_add(pages);
 }
 

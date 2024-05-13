@@ -1328,6 +1328,7 @@ failed:
 	panic("Failed to pre-allocate %s pages for vmalloc area\n", lvl);
 }
 
+// memblock的终结乐章——buddy系统的崭新开始
 void __init mem_init(void)
 {
 	pci_iommu_alloc();
@@ -1351,6 +1352,7 @@ void __init mem_init(void)
 	if (get_gate_vma(&init_mm))
 		kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR, PAGE_SIZE, KCORE_USER);
 
+	// 预先分配p4d页和pud页
 	preallocate_vmalloc_pages();
 }
 
