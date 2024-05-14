@@ -2314,20 +2314,33 @@ static void init_kmem_cache_cpus(struct kmem_cache *s)
  * unfreezes the slabs and puts it on the proper list.
  * Assumes the slab has been already safely taken away from kmem_cache_cpu
  * by the caller.
+ * 
+ * 将cpu->freelist指向的object重新加入到page->freelist的怀抱中
+ * 取消cpu缓存slab的frozen标志位，并将该slab放置到node的列表上
+ * 或把slab直接free掉
+ * 
+ * 这个函数有点拉，建议看Linux最新版本
  */
 static void deactivate_slab(struct kmem_cache *s, struct page *page,
 			    void *freelist)
 {
 	enum slab_modes { M_NONE, M_PARTIAL, M_FULL, M_FREE };
+
+	// n指向要移除的slab所属的内存节点 
 	struct kmem_cache_node *n = get_node(s, page_to_nid(page));
+
 	int lock = 0, free_delta = 0;
 	enum slab_modes l = M_NONE, m = M_NONE;
 	void *nextfree, *freelist_iter, *freelist_tail;
+
+	// 默认情况下，移除的slab放到表头
 	int tail = DEACTIVATE_TO_HEAD;
+
 	unsigned long flags = 0;
 	struct page new;
 	struct page old;
 
+	// 若page->freelist不为空，说明其他CPU曾经释放对象到当前slab中，将其放至表尾
 	if (page->freelist) {
 		stat(s, DEACTIVATE_REMOTE_FREES);
 		tail = DEACTIVATE_TO_TAIL;
@@ -2336,6 +2349,8 @@ static void deactivate_slab(struct kmem_cache *s, struct page *page,
 	/*
 	 * Stage one: Count the objects on cpu's freelist as free_delta and
 	 * remember the last object in freelist_tail for later splicing.
+	 * 
+	 * 获取cpu->freelist指向的空闲对象数 = free_delta
 	 */
 	freelist_tail = NULL;
 	freelist_iter = freelist;
@@ -2374,24 +2389,31 @@ static void deactivate_slab(struct kmem_cache *s, struct page *page,
 	 */
 redo:
 
-	old.freelist = READ_ONCE(page->freelist);
+	old.freelist = READ_ONCE(page->freelist); // 其他CPU释放的空闲对象
 	old.counters = READ_ONCE(page->counters);
 	VM_BUG_ON(!old.frozen);
 
 	/* Determine target state of the slab */
 	new.counters = old.counters;
-	if (freelist_tail) {
+	if (freelist_tail) { // 若slab未被全部分配
+		// counters与inuse为联合体
 		new.inuse -= free_delta;
+
+		// 将其他CPU释放的空闲对象接入freelist_tail
 		set_freepointer(s, freelist_tail, old.freelist);
+
+		// 更新new page的freelist
 		new.freelist = freelist;
 	} else
+		// 若slab全被分配，则将其他CPU释放的空闲对象列表赋给new.freelist
 		new.freelist = old.freelist;
 
 	new.frozen = 0;
 
+	// 若未有对象被分配 且 node partial列表过载，直接free
 	if (!new.inuse && n->nr_partial >= s->min_partial)
 		m = M_FREE;
-	else if (new.freelist) {
+	else if (new.freelist) { // 若freelist不为空，转移至node partial列表
 		m = M_PARTIAL;
 		if (!lock) {
 			lock = 1;
@@ -2415,6 +2437,7 @@ redo:
 		}
 	}
 
+	// 转移slab
 	if (l != m) {
 		if (l == M_PARTIAL)
 			remove_partial(n, page);
@@ -2428,6 +2451,8 @@ redo:
 	}
 
 	l = m;
+	
+	// 若修改期间，page被其他CPU变动了。重来
 	if (!cmpxchg_double_slab(s, page,
 				old.freelist, old.counters,
 				new.freelist, new.counters,
@@ -3746,7 +3771,7 @@ static unsigned int slub_min_order;
 static unsigned int slub_max_order = PAGE_ALLOC_COSTLY_ORDER;
 static unsigned int slub_min_objects;
 
-/*
+/* 返回符合size的slab_order，且保证较小的内存碎片
  * Calculate the order of allocation given an slab object size.
  *
  * The order of allocation has significant impact on performance and other
@@ -3778,15 +3803,24 @@ static inline unsigned int slab_order(unsigned int size,
 	unsigned int min_order = slub_min_order;
 	unsigned int order;
 
+	/**
+	 * 若 2^min_order个内存页可以存放的对象个数超过 32767 限制
+	 * 返回 size * MAX_OBJS_PER_PAGE 所需要的 order 减 1
+	*/
 	if (order_objects(min_order, size) > MAX_OBJS_PER_PAGE)
 		return get_order(size * MAX_OBJS_PER_PAGE) - 1;
 
+	/**
+	 * 从 slab 所需要的最小 order 到最大 order 之间开始遍历
+	 * 查找能够使 slab 碎片最小的 order 值
+	*/
 	for (order = max(min_order, (unsigned int)get_order(min_objects * size));
 			order <= max_order; order++) {
 
 		unsigned int slab_size = (unsigned int)PAGE_SIZE << order;
 		unsigned int rem;
 
+		// 内存分配碎片
 		rem = slab_size % size;
 
 		if (rem <= slab_size / fract_leftover)
@@ -3796,6 +3830,7 @@ static inline unsigned int slab_order(unsigned int size,
 	return order;
 }
 
+// 计算 slab 所需要申请的内存页数
 static inline int calculate_order(unsigned int size)
 {
 	unsigned int order;
@@ -3810,6 +3845,8 @@ static inline int calculate_order(unsigned int size)
 	 *
 	 * First we increase the acceptable waste in a slab. Then
 	 * we reduce the minimum objects required in a slab.
+	 * 
+	 * 计算 slab 中可以容纳的最小对象个数
 	 */
 	min_objects = slub_min_objects;
 	if (!min_objects) {
@@ -3825,28 +3862,42 @@ static inline int calculate_order(unsigned int size)
 		nr_cpus = num_present_cpus();
 		if (nr_cpus <= 1)
 			nr_cpus = nr_cpu_ids;
+		// fls(0)=0，fls(1)=1，fls(4) = 3
 		min_objects = 4 * (fls(nr_cpus) + 1);
 	}
+
+	// slab 最大内存页 order 初始为 3，计算 slab 最大可容纳的对象个数
 	max_objects = order_objects(slub_max_order, size);
+
 	min_objects = min(min_objects, max_objects);
 
 	while (min_objects > 1) {
+
+		// slab 中的碎片控制系数，碎片大小不能超过 (slab所占内存大小 / fraction)
+		// fraction 值越大，slab 中所能容忍的碎片就越小
 		unsigned int fraction;
 
 		fraction = 16;
 		while (fraction >= 4) {
+			// 根据当前 fraction 计算 order，查找出能够使 slab 产生碎片最小化的 order 值
 			order = slab_order(size, min_objects,
 					slub_max_order, fraction);
+			
+			// order 不能超过 max_order，否则需要降低 fraction，放宽对碎片的要求限制
 			if (order <= slub_max_order)
 				return order;
 			fraction /= 2;
 		}
+		// 进一步放宽对 min_object 的要求，slab 会尝试少放一些对象
 		min_objects--;
 	}
 
 	/*
 	 * We were unable to place multiple objects in a slab. Now
 	 * lets see if we can place a single object there.
+	 * 
+	 * 到达次数时，说明无法再slab放置多个对象
+	 * 尝试仅放置一个对象
 	 */
 	order = slab_order(size, 1, slub_max_order, 1);
 	if (order <= slub_max_order)
@@ -3854,6 +3905,9 @@ static inline int calculate_order(unsigned int size)
 
 	/*
 	 * Doh this slab cannot be placed using slub_max_order.
+	 * 
+	 * size过大, slub_max_order无法支持
+	 * 放宽至MAX_ORDER
 	 */
 	order = slab_order(size, 1, MAX_ORDER, 1);
 	if (order < MAX_ORDER)
@@ -3882,6 +3936,8 @@ static inline int alloc_kmem_cache_cpus(struct kmem_cache *s)
 	/*
 	 * Must align to double word boundary for the double cmpxchg
 	 * instructions to work; see __pcpu_double_call_return_bool().
+	 * 
+	 * __alloc_percpu 函数用于分配 percpu 类型的结构体
 	 */
 	s->cpu_slab = __alloc_percpu(sizeof(struct kmem_cache_cpu),
 				     2 * sizeof(void *));
@@ -3889,6 +3945,7 @@ static inline int alloc_kmem_cache_cpus(struct kmem_cache *s)
 	if (!s->cpu_slab)
 		return 0;
 
+	// 初始化 cpu 本地缓存结构 kmem_cache_cpu
 	init_kmem_cache_cpus(s);
 
 	return 1;
@@ -3907,11 +3964,14 @@ static struct kmem_cache *kmem_cache_node;
  */
 static void early_kmem_cache_node_alloc(int node)
 {
+	// slab 所属的 page (或复合页首页)
 	struct page *page;
 	struct kmem_cache_node *n;
 
 	BUG_ON(kmem_cache_node->size < sizeof(struct kmem_cache_node));
 
+	// 根据 kmem_cache 结构中的 oo 属性向指定 node 节点所属的伙伴系统申请 2^order 个内存页 page
+	// 这2^order个内存页就对应一个slab，后续挂载在kmem_cache_node的partial列表上
 	page = new_slab(kmem_cache_node, GFP_NOWAIT, node);
 
 	BUG_ON(!page);
@@ -3923,20 +3983,34 @@ static void early_kmem_cache_node_alloc(int node)
 	n = page->freelist;
 	BUG_ON(!n);
 #ifdef CONFIG_SLUB_DEBUG
+	/* 根据 slab cache 中的 flag 初始化 kmem_cache_node 对象(red_zone, posion等) */
 	init_object(kmem_cache_node, n, SLUB_RED_ACTIVE);
 	init_tracking(kmem_cache_node, n);
 #endif
 	n = kasan_slab_alloc(kmem_cache_node, n, GFP_KERNEL, false);
+
+	// 获取对象 n 中的 free_pointer 指针,指向 n 的下一个空闲对象
 	page->freelist = get_freepointer(kmem_cache_node, n);
+
+	// 表示 slab 中已经有一个对象被使用了
 	page->inuse = 1;
+
+	// 当前slab尚未被加入到cpu缓存列表中
 	page->frozen = 0;
+
+	// 初始化 boot_kmem_cache_node 中的 node cache 数组
 	kmem_cache_node->node[node] = n;
+
 	init_kmem_cache_node(n);
+
+	// kmem_cache_node 结构中的 nr_slabs 计数加1，total_objects 加 page->objects
 	inc_slabs_node(kmem_cache_node, node, page->objects);
 
 	/*
 	 * No locks need to be taken here as it has just been
 	 * initialized and there is no concurrent access.
+	 * 
+	 * 将新创建出来的 slab （page表示），添加到对象n kmem_cache_node结构）的 partial 列表头部
 	 */
 	__add_partial(n, page, DEACTIVATE_TO_HEAD);
 }
@@ -3967,9 +4041,16 @@ static int init_kmem_cache_nodes(struct kmem_cache *s)
 		struct kmem_cache_node *n;
 
 		if (slab_state == DOWN) {
+			/**
+			 * 如果此时 slab allocator 体系还未建立，则调用该方法分配 kmem_cache_node 结构(对象池)，并初始化
+			 * slab cache 的正常创建流程不会走到这个分支
+			 * 该分支用于在内核初始化的时候创建 kmem_cache_node 对象池使用
+			*/
 			early_kmem_cache_node_alloc(node);
 			continue;
 		}
+		
+		// 分配kmem_cache_node对象
 		n = kmem_cache_alloc_node(kmem_cache_node,
 						GFP_KERNEL, node);
 
@@ -3978,7 +4059,9 @@ static int init_kmem_cache_nodes(struct kmem_cache *s)
 			return 0;
 		}
 
+		// 初始化kmem_cache_node对象
 		init_kmem_cache_node(n);
+
 		s->node[node] = n;
 	}
 	return 1;
@@ -4012,8 +4095,10 @@ static void set_cpu_partial(struct kmem_cache *s)
 	 * B) The number of objects in cpu partial slabs to extract from the
 	 *    per node list when we run out of per cpu objects. We only fetch
 	 *    50% to keep some capacity around for frees.
+	 * 
+	 * 空闲对象size越小, cpu_partial(每个CPU允许持有的空闲对象数)越高
 	 */
-	if (!kmem_cache_has_cpu_partial(s))
+	if (!kmem_cache_has_cpu_partial(s)) // 判断 kmem_cache_cpu 是否包含有 partial 列表
 		slub_set_cpu_partial(s, 0);
 	else if (s->size >= PAGE_SIZE)
 		slub_set_cpu_partial(s, 2);
@@ -4048,6 +4133,9 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 * Determine if we can poison the object itself. If the user of
 	 * the slab may touch the object after free or before allocation
 	 * then we should never poison the object itself.
+	 * 
+	 * SLAB_POISON: 将对象所占内存用 0x6b 填充，并用0xa5填充object size的最后一个字节(检测越界访问)
+	 * SLAB_TYPESAFE_BY_RCU：启用 RCU 锁释放 slab
 	 */
 	if ((flags & SLAB_POISON) && !(flags & SLAB_TYPESAFE_BY_RCU) &&
 			!s->ctor)
@@ -4060,6 +4148,10 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 * If we are Redzoning then check if there is some space between the
 	 * end of the object and the free pointer. If not then add an
 	 * additional word to have some bytes to store Redzone information.
+	 * 
+	 * SLAB_RED_ZONE：在对象前后插入 red zone 红色区域（特定字节 0xbb），防止对象溢出越界
+	 * size == s->object_size 表示对象 object size 与 word size 本来就是对齐的
+	 * 这时就需要在对象 object size 内存区域的后面插入一段 word size 大小的 red zone
 	 */
 	if ((flags & SLAB_RED_ZONE) && size == s->object_size)
 		size += sizeof(void *);
@@ -4071,6 +4163,10 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 */
 	s->inuse = size;
 
+	/**
+	 * 若开启了 RCU 保护 || 设置了对象 poison || 设置了对象的构造函数
+	 * 则额外增加一个 word size 大小的空间来存放 free pointer
+	*/
 	if ((flags & (SLAB_TYPESAFE_BY_RCU | SLAB_POISON)) ||
 	    ((flags & SLAB_RED_ZONE) && s->object_size < sizeof(void *)) ||
 	    s->ctor) {
@@ -4104,12 +4200,18 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 		/*
 		 * Need to store information about allocs and frees after
 		 * the object.
+		 * 
+		 * SLAB_STORE_USER 表示需要跟踪对象的分配和释放信息
+		 * 需要在对象的末尾增加两个 struct track 结构，存储分配和释放的信息
 		 */
 		size += 2 * sizeof(struct track);
 #endif
 
 	kasan_cache_create(s, &size, &s->flags);
+
 #ifdef CONFIG_SLUB_DEBUG
+	// 在对象内存区域的struct track后增加一段word_size
+	// 在对象内存区域的左侧增加一段red_zone
 	if (flags & SLAB_RED_ZONE) {
 		/*
 		 * Add some empty padding so that we can catch
@@ -4133,48 +4235,59 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 */
 	size = ALIGN(size, s->align);
 	s->size = size;
+
+	// size乘法逆元
 	s->reciprocal_size = reciprocal_value(size);
+
 	if (forced_order >= 0)
 		order = forced_order;
 	else
-		order = calculate_order(size);
+		order = calculate_order(size); // 计算 slab 所需要申请的内存页数（2 ^ order 个内存页）
 
 	if ((int)order < 0)
 		return 0;
 
+	// 根据 slab 的 flag 设置，设置向伙伴系统申请内存时使用的 allocflags
 	s->allocflags = 0;
 	if (order)
-		s->allocflags |= __GFP_COMP;
+		s->allocflags |= __GFP_COMP; // slab 所需要的内存页多于 1 页时，则向伙伴系统申请复合页
 
 	if (s->flags & SLAB_CACHE_DMA)
-		s->allocflags |= GFP_DMA;
+		s->allocflags |= GFP_DMA; // 从 DMA 区域中获取适用于 DMA 的内存页
 
 	if (s->flags & SLAB_CACHE_DMA32)
-		s->allocflags |= GFP_DMA32;
+		s->allocflags |= GFP_DMA32; // 从 DMA32 区域中获取适用于 DMA 的内存页
 
 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
-		s->allocflags |= __GFP_RECLAIMABLE;
+		s->allocflags |= __GFP_RECLAIMABLE; // 申请可回收的内存页
 
 	/*
 	 * Determine the number of objects per slab
+	 * 计算 slab cache 中的 oo，min，max 值
 	 */
 	s->oo = oo_make(order, size);
+
+	// get_order 函数计算出的 order 为容纳一个 size 大小的对象至少需要的内存页个数
 	s->min = oo_make(get_order(size), size);
-	if (oo_objects(s->oo) > oo_objects(s->max))
+	if (oo_objects(s->oo) > oo_objects(s->max)) // 初始时 max 和 oo 相等
 		s->max = s->oo;
 
+	// 若能容纳空闲对象，则返回1，不能则返回0
 	return !!oo_objects(s->oo);
 }
 
+// kmem_cache分配核心函数
 static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 {
+	// 增加debug标志位
 	s->flags = kmem_cache_flags(s->size, flags, s->name);
 #ifdef CONFIG_SLAB_FREELIST_HARDENED
 	s->random = get_random_long();
 #endif
-
+	// 计算 slab 中对象的整体内存布局所需要的 size, 并初始化相关数据
 	if (!calculate_sizes(s, -1))
 		goto error;
+	
 	if (disable_higher_order_debug) {
 		/*
 		 * Disable debugging flags that store metadata if the min slab
@@ -4198,9 +4311,12 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 	/*
 	 * The larger the object size is, the more pages we want on the partial
 	 * list to avoid pounding the page allocator excessively.
+	 * 
+	 * 设置min_partial，限制numa node中缓存的slab个数上限
 	 */
 	set_min_partial(s, ilog2(s->size) / 2);
 
+	// 设置cpu_partial, 限制cpu本地缓存partial列表中空闲对象个数的上限
 	set_cpu_partial(s);
 
 #ifdef CONFIG_NUMA
@@ -4213,9 +4329,11 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 			goto error;
 	}
 
+	// 创建 kmem_cache_node
 	if (!init_kmem_cache_nodes(s))
 		goto error;
 
+	// 创建 kmem_cache_cpu
 	if (alloc_kmem_cache_cpus(s))
 		return 0;
 
@@ -4772,17 +4890,25 @@ static struct notifier_block slab_memory_callback_nb = {
 static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 {
 	int node;
+
+	// kmem_cache 指向专门管理 kmem_cache 对象的 slab cache
 	struct kmem_cache *s = kmem_cache_zalloc(kmem_cache, GFP_NOWAIT);
 	struct kmem_cache_node *n;
 
+	// 将静态的 kmem_cache 对象深拷贝到最终的 kmem_cache 对象 s 中
 	memcpy(s, static_cache, kmem_cache->object_size);
 
 	/*
 	 * This runs very early, and only the boot processor is supposed to be
 	 * up.  Even if it weren't true, IRQs are not up so we couldn't fire
 	 * IPIs around.
+	 * 
+	 * 释放本地 cpu 缓存的 slab
 	 */
 	__flush_cpu_slab(s, smp_processor_id());
+
+	// 遍历 node cache 数组
+	// 修正 kmem_cache_node 结构中 partial 链表中包含的 slab （ page 表示）对应 page 结构的 slab_cache
 	for_each_kmem_cache_node(s, node, n) {
 		struct page *p;
 
@@ -4798,8 +4924,11 @@ static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 	return s;
 }
 
+// 创建并初始化 slab allocator 体系
 void __init kmem_cache_init(void)
 {
+	// boot_kmem_cache 用于临时创建 kmem_cache 结构
+	// boot_kmem_cache_node 用于临时创建 kmem_cache_node 结构
 	static __initdata struct kmem_cache boot_kmem_cache,
 		boot_kmem_cache_node;
 	int node;
@@ -4809,7 +4938,7 @@ void __init kmem_cache_init(void)
 
 	/* Print slub debugging pointers without hashing */
 	if (__slub_debug_enabled())
-		no_hash_pointers_enable(NULL);
+		no_hash_pointers_enable(NULL); // 输出notice
 
 	kmem_cache_node = &boot_kmem_cache_node;
 	kmem_cache = &boot_kmem_cache;
@@ -4821,6 +4950,7 @@ void __init kmem_cache_init(void)
 	for_each_node_state(node, N_NORMAL_MEMORY)
 		node_set(node, slab_nodes);
 
+	// 静态初始化 boot_kmem_cache_node 
 	create_boot_cache(kmem_cache_node, "kmem_cache_node",
 		sizeof(struct kmem_cache_node), SLAB_HWCACHE_ALIGN, 0, 0);
 
@@ -4829,13 +4959,17 @@ void __init kmem_cache_init(void)
 	/* Able to allocate the per node structures */
 	slab_state = PARTIAL;
 
+	// 静态地初始化 boot_kmem_cache
 	create_boot_cache(kmem_cache, "kmem_cache",
 			offsetof(struct kmem_cache, node) +
 				nr_node_ids * sizeof(struct kmem_cache_node *),
 		       SLAB_HWCACHE_ALIGN, 0, 0);
 
+	// 深拷贝
 	kmem_cache = bootstrap(&boot_kmem_cache);
 	kmem_cache_node = bootstrap(&boot_kmem_cache_node);
+
+	/* 以下为 kmalloc 初始化进程  */
 
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
 	setup_kmalloc_cache_index_table();
@@ -4889,18 +5023,31 @@ __kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 	return s;
 }
 
+/** slab cache创建核心函数
+ * 初始化 kmem_cache 结构中的重要属性
+ * 创建并初始化 kmem_cache_cpu 和 kmem_cache_node 结构
+*/
 int __kmem_cache_create(struct kmem_cache *s, slab_flags_t flags)
 {
 	int err;
 
+	// 创建并初始化 kmem_cache_cpu 和 kmem_cache_node 结构
 	err = kmem_cache_open(s, flags);
 	if (err)
 		return err;
 
-	/* Mutex is not taken during early boot */
+	/** Mutex is not taken during early boot
+	 *  
+	 * 检查内核中 slab 分配器是否初始化完毕
+	 * 状态为 FULL 则初始化完毕
+	 * slab_sysfs_init 函数中将 slab_state 设置为 FULL
+	 * 
+	 * state小于等于UP时，还不能将slab cache导出到sysfs
+	*/
 	if (slab_state <= UP)
 		return 0;
 
+	// 在 sys 文件系统中创建 /sys/kernel/slab/name 目录
 	err = sysfs_slab_add(s);
 	if (err) {
 		__kmem_cache_release(s);

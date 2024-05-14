@@ -197,6 +197,7 @@ int slab_unmergeable(struct kmem_cache *s)
 	return 0;
 }
 
+// 查找属性相近的kmem_cache以作合并
 struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 		slab_flags_t flags, const char *name, void (*ctor)(void *))
 {
@@ -208,33 +209,49 @@ struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 	if (ctor)
 		return NULL;
 
+	// 与 word size 进行对齐
 	size = ALIGN(size, sizeof(void *));
+
+	// 根据对齐参数 align 并结合 CPU cache line 大小，计算合适的对齐参数
 	align = calculate_alignment(flags, align, size);
+
+	// 对象 size 重新按照 align 进行对齐
 	size = ALIGN(size, align);
+
+	// 增加debug标志位
 	flags = kmem_cache_flags(size, flags, name);
 
+	// 如果 flag 设置的是不允许合并，则停止
 	if (flags & SLAB_NEVER_MERGE)
 		return NULL;
 
+	// 遍历内核中已有的 slab cache，寻找可以合并的 slab cache
 	list_for_each_entry_reverse(s, &slab_caches, list) {
 		if (slab_unmergeable(s))
 			continue;
 
+		// 指定对象 object-size 不能超过已有 slab cache 中的对象 size
 		if (size > s->size)
 			continue;
 
+		// 校验指定的 flag 是否与已有 slab cache 中的 flag 一致
 		if ((flags & SLAB_MERGE_SAME) != (s->flags & SLAB_MERGE_SAME))
 			continue;
 		/*
 		 * Check if alignment is compatible.
 		 * Courtesy of Adrian Drzewiecki
+		 * 
+		 * 检查对齐位数是否兼容
 		 */
 		if ((s->size & ~(align - 1)) != s->size)
 			continue;
 
+		// 两者的 size 相差在一个 word size 之内
+		// SLAB_NEVER_MERGE标志位已经保证了没有red_zone等区域
 		if (s->size - size >= sizeof(void *))
 			continue;
 
+		// 已有 slab cache 中对象的对齐 s->align 要大于等于指定的 align 并且可以整除 align
 		if (IS_ENABLED(CONFIG_SLAB) && align &&
 			(align > s->align || s->align % align))
 			continue;
@@ -257,10 +274,14 @@ static struct kmem_cache *create_cache(const char *name,
 		useroffset = usersize = 0;
 
 	err = -ENOMEM;
+
+	// 为将要创建的 slab cache 分配 kmem_cache 结构
+	// 即从kmem_cache对象池中分配一个kmem_cache对象
 	s = kmem_cache_zalloc(kmem_cache, GFP_KERNEL);
 	if (!s)
 		goto out;
 
+	// kmem_cache初始化
 	s->name = name;
 	s->size = s->object_size = object_size;
 	s->align = align;
@@ -268,11 +289,18 @@ static struct kmem_cache *create_cache(const char *name,
 	s->useroffset = useroffset;
 	s->usersize = usersize;
 
+	/**
+	 * 创建 slab cache 的核心函数，这里会初始化 kmem_cache 结构中的其他重要属性
+	 * 创建初始化 kmem_cache_cpu 和 kmem_cache_node 结构
+	*/
 	err = __kmem_cache_create(s, flags);
 	if (err)
 		goto out_free_cache;
 
+	// slab cache 初始状态下，引用计数为 1
 	s->refcount = 1;
+
+	// 将新建的 slab cache 加入到内核中的全局链表管理
 	list_add(&s->list, &slab_caches);
 out:
 	if (err)
@@ -280,6 +308,7 @@ out:
 	return s;
 
 out_free_cache:
+	// 创建过程出现错误之后，释放 kmem_cache 对象
 	kmem_cache_free(kmem_cache, s);
 	goto out;
 }

@@ -46,11 +46,17 @@ enum stat_item {
  * with this_cpu_cmpxchg_double() alignment requirements.
  */
 struct kmem_cache_cpu {
-	// 指向被 CPU 本地缓存的 slab 中第一个空闲的对象
-	void **freelist;	/* Pointer to next available object */
+	/** 
+	 * 指向被 CPU 本地缓存的 slab 中第一个空闲的对象
+	 * Pointer to next available object 
+	 */
+	void **freelist;	
 
-	// 确保kmem_cache_cpu 与当前执行进程的 cpu 是一致的
-	unsigned long tid;	/* Globally unique transaction id */
+	/**
+	 * 确保kmem_cache_cpu 与当前执行进程的 cpu 是一致的
+	 * Globally unique transaction id
+	*/
+	unsigned long tid;
 
 	struct page *page;	/* The slab from which we are allocating */
 #ifdef CONFIG_SLUB_CPU_PARTIAL
@@ -110,13 +116,14 @@ struct kmem_cache {
 
 	/*
 	 * The size of an object including metadata
-	 * slab 对象在内存中的真实占用，包括为了内存对齐填充的字节数，red zone 等等
+	 * slab 对象在内存中的真实占用，包括内存对齐填充的字节数，red zone 等等
 	*/
 	unsigned int size;
 
 	// slab 中对象的实际大小，不包含填充的字节数
 	unsigned int object_size;
 
+	// size的乘法逆元
 	struct reciprocal_value reciprocal_size;
 
 	// 下一个空闲对象指针(Free pointer)的位置距离对象首地址的偏移(用于poison的情况)
@@ -164,6 +171,7 @@ struct kmem_cache {
 #ifdef CONFIG_NUMA
 	/*
 	 * Defragmentation by allocating from a remote node.
+	 * 初始化为1000
 	 */
 	unsigned int remote_node_defrag_ratio;
 #endif

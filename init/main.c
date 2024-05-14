@@ -850,7 +850,9 @@ static void __init mm_init(void)
 	mem_init_print_info();
 	/* page_owner must be initialized after buddy is ready */
 	page_ext_init_flatmem_late();
-	kmem_cache_init();
+
+	kmem_cache_init(); // 创建并初始化 slab allocator 体系
+	
 	kmemleak_init();
 	pgtable_init();
 	debug_objects_mem_init();
