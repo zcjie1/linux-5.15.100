@@ -107,6 +107,9 @@
 /*
  * Variant on the per-CPU variable declaration/definition theme used for
  * ordinary per-CPU variables.
+ * 
+ * 将变量定义至 ".data..percpu" section中
+ * 该section的变量在内核启动时被拷贝至每个CPU的percpu内存块
  */
 #define DECLARE_PER_CPU(type, name)					\
 	DECLARE_PER_CPU_SECTION(type, name, "")

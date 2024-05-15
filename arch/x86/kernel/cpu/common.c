@@ -598,7 +598,31 @@ void load_percpu_segment(int cpu)
 #ifdef CONFIG_X86_32
 	loadsegment(fs, __KERNEL_PERCPU);
 #else
+	// mov指令只支持低32位修改
 	__loadsegment_simple(gs, 0);
+	/*
+	do {
+		unsigned short __val = (0); 
+		asm volatile(
+			"1: movl %k0,%%gs            \n" // 将__val的值移动到%gs段寄存器
+			".section .fixup,\"ax\"      \n" // 开始一个新的代码段，称为.fixup
+			"2: xorl %k0,%k0             \n" // 在异常处理部分，将__val清零
+			"    jmp 1b                  \n" // 跳回到标签1继续执行
+			".previous                  \n" // 恢复到之前的代码段
+			".pushsection \"__ex_table\",\"a\"\n" // 开始一个新的数据段__ex_table
+			" .balign 4                 \n" // 将接下来的代码段对齐到4字节边界
+			" .long (1b) - .            \n" // 将1b的地址相对于当前地址写入表中
+			" .long (2b) - .            \n" // 将2b的地址相对于当前地址写入表中
+			" .long 1                   \n" // 写入1作为处理类型（示例值）
+			".popsection                \n" // 恢复到之前的数据段
+			: "+r" (__val)  // 输出操作数，+表示输入输出，r表示寄存器
+			:                // 无额外的输入操作数
+			: "memory"       // clobber list，表示该代码段会修改内存
+		); 
+	} while (0);
+	*/
+
+	// 对GS寄存器高位(64位)的修改需要通过MSR寄存器完成
 	wrmsrl(MSR_GS_BASE, cpu_kernelmode_gs_base(cpu));
 #endif
 }
@@ -638,7 +662,7 @@ void switch_to_new_gdt(int cpu)
 {
 	/* Load the original GDT */
 	load_direct_gdt(cpu);
-	/* Reload the per-cpu base */
+	/* Reload the per-cpu base 加载GS寄存器 */
 	load_percpu_segment(cpu);
 }
 

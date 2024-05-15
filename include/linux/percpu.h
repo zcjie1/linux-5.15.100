@@ -72,16 +72,17 @@ struct pcpu_group_info {
 						 * entries contain NR_CPUS */
 };
 
+// percpu内存管理信息
 struct pcpu_alloc_info {
-	size_t			static_size;
-	size_t			reserved_size;
-	size_t			dyn_size;
-	size_t			unit_size;
-	size_t			atom_size;
-	size_t			alloc_size;
-	size_t			__ai_size;	/* internal, don't use */
-	int			nr_groups;	/* 0 if grouping unnecessary */
-	struct pcpu_group_info	groups[];
+	size_t			static_size; //静态定义的percpu变量占用内存区域长度
+	size_t			reserved_size; //预留区域，在percpu内存分配指定为预留区域分配时，将使用该区域
+	size_t			dyn_size;  //动态分配的percpu变量占用内存区域长度
+	size_t			unit_size; //每个cpu的percpu空间所占得内存空间为一个unit, 每个unit的大小记为unit_size
+	size_t			atom_size; //PAGE_SIZE
+	size_t			alloc_size; //要分配的percpu内存空间
+	size_t			__ai_size;	/* internal, don't use——整个pcpu_alloc_info结构体的大小 */
+	int			nr_groups;	/* 0 if grouping unnecessary——该架构下的处理器分组数目*/
+	struct pcpu_group_info	groups[]; //该架构下的处理器分组信息
 };
 
 enum pcpu_fc {

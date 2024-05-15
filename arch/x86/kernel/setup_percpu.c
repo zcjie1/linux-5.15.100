@@ -196,12 +196,30 @@ void __init setup_per_cpu_areas(void)
 		 * can also allow using PMD mappings in vmalloc area.  Use
 		 * PAGE_SIZE on 32bit as vmalloc space is highly contended
 		 * and large vmalloc area allocs can easily fail.
+		 * 
+		 * 64位系统使用2M页
 		 */
 #ifdef CONFIG_X86_64
 		atom_size = PMD_SIZE;
 #else
 		atom_size = PAGE_SIZE;
 #endif
+		/** 使用Embedding allocator分配percpu块(每个group一个块，后续根据CPU个数划分unit)
+		 * 
+		 * PERCPU_FIRST_CHUNK_RESERVE: 决定preserved_size
+		 * 
+		 * dyn_size: 决定dynamic_size
+		 * 
+		 * atom_size: 决定了每次为cpu_area分配地址的最小单位
+		 * 
+		 * 用pcpu_cpu_distance计算CPU与Node的affinity，划分CPU Group
+		 * 以Group为单位进行虚拟地址空间划分(不同组的虚拟地址空间不连续)
+		 * 
+		 * pcpu_fc_alloc: 
+		 * 为每个cpu first chunk分配内存，从memblock.memory中分配物理地址，再通过phys_to_virt()转成虚拟地址
+		 * 
+		 * pcpu_fc_free: 释放虚拟地址对应的物理地址到memblock.memory中
+		 */
 		rc = pcpu_embed_first_chunk(PERCPU_FIRST_CHUNK_RESERVE,
 					    dyn_size, atom_size,
 					    pcpu_cpu_distance,
@@ -211,6 +229,7 @@ void __init setup_per_cpu_areas(void)
 				pcpu_fc_names[pcpu_chosen_fc], rc);
 	}
 	if (rc < 0)
+		// 使用page allocator分配percpu内存(用于32位模式)
 		rc = pcpu_page_first_chunk(PERCPU_FIRST_CHUNK_RESERVE,
 					   pcpu_fc_alloc, pcpu_fc_free,
 					   pcpup_populate_pte);
@@ -259,6 +278,9 @@ void __init setup_per_cpu_areas(void)
 		/*
 		 * Up to this point, the boot CPU has been using .init.data
 		 * area.  Reload any changed state for the boot CPU.
+		 * 
+		 * 刷新GDT全局描述符表
+		 * 设置percpu的GS寄存器
 		 */
 		if (!cpu)
 			switch_to_new_gdt(cpu);

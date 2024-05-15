@@ -3065,7 +3065,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 			cpu = gi->cpu_map[i];
 		BUG_ON(cpu == NR_CPUS);
 
-		/* allocate space for the whole group */
+		/* allocate space for the whole group —— 为每个CPU Group分配内存 */
 		ptr = alloc_fn(cpu, gi->nr_units * ai->unit_size, atom_size);
 		if (!ptr) {
 			rc = -ENOMEM;
@@ -3108,7 +3108,9 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 				free_fn(ptr, ai->unit_size);
 				continue;
 			}
-			/* copy and return the unused part */
+			/** copy and return the unused part
+			 * 将vmlinux的.data..percpu section拷贝到各个cpu的percpu内存块
+			 */
 			memcpy(ptr, __per_cpu_load, ai->static_size);
 			free_fn(ptr + size_sum, ai->unit_size - size_sum);
 		}
@@ -3123,6 +3125,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		PFN_DOWN(size_sum), ai->static_size, ai->reserved_size,
 		ai->dyn_size, ai->unit_size);
 
+	// 将每个cpu的percpu area划分为三部分: static_size，preserved_size和dynamic_size
 	pcpu_setup_first_chunk(ai, base);
 	goto out_free;
 
