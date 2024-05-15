@@ -4970,6 +4970,16 @@ static bool oom_reserves_allowed(struct task_struct *tsk)
 /*
  * Distinguish requests which really need access to full memory
  * reserves from oom victims which can live with a portion of it
+ * 
+ * 如果不允许从紧急预留内存中分配，则不改变 alloc_flags
+ * 
+ * 如果允许从紧急预留内存中分配，则后面的内存分配会忽略内存水位线的限制
+ * 
+ * 如果当前进程处于软中断上下文并且进程设置了 PF_MEMALLOC 标识，则忽略水位线
+ * 
+ * 如果当前进程不在任何中断上下文中，即在进程上下文中
+ * 若置位PF_MEMALLOC，则忽略水位线
+ * 若当前进程是OOM选择的对象，允许当前进程进行 OOM
  */
 static inline int __gfp_pfmemalloc_flags(gfp_t gfp_mask)
 {

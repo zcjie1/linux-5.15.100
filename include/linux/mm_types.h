@@ -85,6 +85,8 @@ struct page {
 			 * lruvec->lru_lock.  Sometimes used as a generic list
 			 * by the page owner.
 			 * 
+			 * 若 page 是从预留内存分配的，则lru.next的最后一位置1
+			 * 
 			 * least recently used —— 用于管理active和inactive页链表
 			 * 四种LRU链表 (匿名页的 active 链表，inactive 链表和文件页的active 链表， inactive 链表)
 			 * 一种mlock链表(页不会被换出)
