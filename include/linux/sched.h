@@ -1181,7 +1181,7 @@ struct task_struct {
 #endif
 
 	/* VM state: 虚拟内存状态*/
-	struct reclaim_state		*reclaim_state;
+	struct reclaim_state		*reclaim_state; // 回收slab数量
 
 	struct backing_dev_info		*backing_dev_info;
 

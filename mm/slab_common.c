@@ -511,14 +511,17 @@ static void slab_caches_to_rcu_destroy_workfn(struct work_struct *work)
 	}
 }
 
+// slab cache 销毁的核心函数
 static int shutdown_cache(struct kmem_cache *s)
 {
 	/* free asan quarantined objects */
 	kasan_cache_shutdown(s);
 
+	// 释放 slab cache 占用的所有资源
 	if (__kmem_cache_shutdown(s) != 0)
 		return -EBUSY;
 
+	// 从 slab cache 的全局列表中删除该 slab cache
 	list_del(&s->list);
 
 	if (s->flags & SLAB_TYPESAFE_BY_RCU) {
@@ -531,9 +534,17 @@ static int shutdown_cache(struct kmem_cache *s)
 		kfence_shutdown_cache(s);
 		debugfs_slab_release(s);
 #ifdef SLAB_SUPPORTS_SYSFS
+		// 释放 sys 文件系统中移除 /sys/kernel/slab/name 节点的相关资源
 		sysfs_slab_unlink(s);
+
+		// slab_kmem_cache_release(s)的功能被移至下列函数
+		// sysfs_slab_add时将kmem_cache_release函数加入到kobject中
+		// sysfs_slab_release中调用对应的release函数
 		sysfs_slab_release(s);
 #else
+		// 释放 kmem_cache_cpu 结构
+    	// 释放 kmem_cache_node 结构
+    	// 释放 kmem_cache 结构
 		slab_kmem_cache_release(s);
 #endif
 	}
@@ -548,6 +559,19 @@ void slab_kmem_cache_release(struct kmem_cache *s)
 	kmem_cache_free(kmem_cache, s);
 }
 
+/** slab cache 销毁
+ * 
+ * 首先需要释放 slab cache 在所有 cpu 中的缓存 kmem_cache_cpu 中占用的资源
+ * 包括cpu 缓存的 slab 和 kmem_cache_cpu->partial 链表中的 slab
+ * 
+ * 释放 slab cache 在所有 NUMA 节点中的缓存 kmem_cache_node 占用的资源
+ * 
+ * 在 sys 文件系统中移除 /sys/kernel/slab/<cacchename> 节点相关信息
+ * 
+ * 从 slab cache 的全局列表中删除该 slab cache
+ * 
+ * 释放 kmem_cache_cpu 结构，kmem_cache_node 结构，kmem_cache 结构
+*/
 void kmem_cache_destroy(struct kmem_cache *s)
 {
 	int err;
@@ -558,10 +582,13 @@ void kmem_cache_destroy(struct kmem_cache *s)
 	cpus_read_lock();
 	mutex_lock(&slab_mutex);
 
+	// 减少slab cache的引用计数
 	s->refcount--;
 	if (s->refcount)
+		// 如果该 slab cache 还存在引用，则不销毁，跳转到 out_unlock 分支
 		goto out_unlock;
 
+	// slab cache 销毁的核心函数
 	err = shutdown_cache(s);
 	if (err) {
 		pr_err("%s %s: Slab cache still has objects\n",

@@ -2027,6 +2027,7 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 
 static void __free_slab(struct kmem_cache *s, struct page *page)
 {
+	// 若slub为复合页，计算需要释放的page数
 	int order = compound_order(page);
 	int pages = 1 << order;
 
@@ -2039,13 +2040,23 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 			check_object(s, page, p, SLUB_RED_INACTIVE);
 	}
 
+	// 清除PG_active标志位
 	__ClearPageSlabPfmemalloc(page);
+
+	// 清除PG_slab标志位
 	__ClearPageSlab(page);
+
 	/* In union with page->mapping where page allocator expects NULL */
-	page->slab_cache = NULL;
+	page->slab_cache = NULL; // 清除page的slab_cache指针
+
+	// 更新统计计数
 	if (current->reclaim_state)
 		current->reclaim_state->reclaimed_slab += pages;
+
+	// cgroup相关操作
 	unaccount_slab_page(page, order, s);
+
+	// 释放物理页
 	__free_pages(page, order);
 }
 
@@ -2064,9 +2075,13 @@ static void free_slab(struct kmem_cache *s, struct page *page)
 		__free_slab(s, page);
 }
 
+// 将slab释放回伙伴系统
 static void discard_slab(struct kmem_cache *s, struct page *page)
-{
+{	
+	// 更新node节点的统计计数
 	dec_slabs_node(s, page_to_nid(page), page->objects);
+
+	// 释放slab
 	free_slab(s, page);
 }
 
@@ -2547,12 +2562,14 @@ redo:
 }
 
 #ifdef CONFIG_SLUB_CPU_PARTIAL
+// 将原cpu partial列表中的slub移动至node partial中
 static void __unfreeze_partials(struct kmem_cache *s, struct page *partial_page)
 {
 	struct kmem_cache_node *n = NULL, *n2 = NULL;
 	struct page *page, *discard_page = NULL;
 	unsigned long flags = 0;
 
+	// 遍历需要移动的page
 	while (partial_page) {
 		struct page new;
 		struct page old;
@@ -2562,6 +2579,7 @@ static void __unfreeze_partials(struct kmem_cache *s, struct page *partial_page)
 
 		n2 = get_node(s, page_to_nid(page));
 		if (n != n2) {
+			// 若当前node与前一个node不同，解锁前一个node
 			if (n)
 				spin_unlock_irqrestore(&n->list_lock, flags);
 
@@ -2583,12 +2601,15 @@ static void __unfreeze_partials(struct kmem_cache *s, struct page *partial_page)
 		} while (!__cmpxchg_double_slab(s, page,
 				old.freelist, old.counters,
 				new.freelist, new.counters,
-				"unfreezing slab"));
+				"unfreezing slab")); // 更新page的frozen位
 
+		// 若当前slub为空，且node partial列表过载
 		if (unlikely(!new.inuse && n->nr_partial >= s->min_partial)) {
+			// 此处先将discard_page连成一个链表，并不处理
 			page->next = discard_page;
 			discard_page = page;
 		} else {
+			// 将当前slub加入node partial列表中
 			add_partial(n, page, DEACTIVATE_TO_TAIL);
 			stat(s, FREE_ADD_PARTIAL);
 		}
@@ -2597,6 +2618,7 @@ static void __unfreeze_partials(struct kmem_cache *s, struct page *partial_page)
 	if (n)
 		spin_unlock_irqrestore(&n->list_lock, flags);
 
+	// 将 discard_page 链表中的 slub 统一释放回伙伴系统
 	while (discard_page) {
 		page = discard_page;
 		discard_page = discard_page->next;
@@ -2653,8 +2675,17 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 
 	local_lock_irqsave(&s->cpu_slab->lock, flags);
 
+	// 获取 slab cache 中原有的 cpu 本地缓存 partial 列表首页
 	oldpage = this_cpu_read(s->cpu_slab->partial);
 
+	/**
+	 * 若 partial 列表不为空，则需要判断 partial 列表中空闲对象总数是否超过了 s->cpu_partial 规定的阈值
+	 * 
+	 * 若超过, 则将cpu->partial 列表中所有 slub 转移到 node partial 列表中
+	 * 转移之后，再把当前 slub 插入到 kmem_cache_cpu->partial 列表中
+	 * 
+	 * 如果没有超过 s->cpu_partial ，则无需转移直接插入
+	*/
 	if (oldpage) {
 		if (drain && oldpage->pobjects > slub_cpu_partial(s)) {
 			/*
@@ -2670,17 +2701,22 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 		}
 	}
 
+	// 更新slab_list 剩余page数 和 空闲对象数
 	pages++;
 	pobjects += page->objects - page->inuse;
 
+	// 更新当前slub对象属性
 	page->pages = pages;
 	page->pobjects = pobjects;
 	page->next = oldpage;
 
+	// 将当前page加入cpu partial列表
 	this_cpu_write(s->cpu_slab->partial, page);
 
+	// 解除kmem_cache_cpu锁
 	local_unlock_irqrestore(&s->cpu_slab->lock, flags);
 
+	// 若partial列表的原slub需要被移动至node
 	if (page_to_unfreeze) {
 		__unfreeze_partials(s, page_to_unfreeze);
 		stat(s, CPU_PARTIAL_DRAIN);
@@ -2759,8 +2795,10 @@ static void flush_cpu_slab(struct work_struct *w)
 	c = this_cpu_ptr(s->cpu_slab);
 
 	if (c->page)
+		// 移动 cpu 本地缓存的 slub 到 node partial
 		flush_slab(s, c);
-
+	
+	// cpu 本地缓存中的 partial 列表里的 slub 全部移动至 node partial
 	unfreeze_partials(s);
 }
 
@@ -2782,18 +2820,24 @@ static void flush_all_cpus_locked(struct kmem_cache *s)
 	lockdep_assert_cpus_held();
 	mutex_lock(&flush_lock);
 
+	// 收集需要free的 cpu slab
 	for_each_online_cpu(cpu) {
 		sfw = &per_cpu(slub_flush, cpu);
 		if (!has_cpu_slab(cpu, s)) {
 			sfw->skip = true;
 			continue;
 		}
+
+		// flush_cpu_slab为真正处理cpu slab的函数
 		INIT_WORK(&sfw->work, flush_cpu_slab);
 		sfw->skip = false;
 		sfw->s = s;
+
+		// 将当前cpu slab的释放工作加入到当前CPU的flushwq工作队列
 		queue_work_on(cpu, flushwq, &sfw->work);
 	}
 
+	// 等待工作队列完成释放工作
 	for_each_online_cpu(cpu) {
 		sfw = &per_cpu(slub_flush, cpu);
 		if (sfw->skip)
@@ -2919,8 +2963,10 @@ static inline bool pfmemalloc_match(struct page *page, gfp_t gfpflags)
  */
 static inline bool pfmemalloc_match_unsafe(struct page *page, gfp_t gfpflags)
 {
-	if (unlikely(__PageSlabPfmemalloc(page))) 
-		return gfp_pfmemalloc_allowed(gfpflags); // 若内存分配无视水位线，返回true
+	// 判断页是否置位PG_active
+	if (unlikely(__PageSlabPfmemalloc(page)))
+		// 若内存分配无视水位线，返回true，否则返回false 
+		return gfp_pfmemalloc_allowed(gfpflags); 
 
 	return true;
 }
@@ -3033,8 +3079,13 @@ redo:
 	 * 若page的PG_active置位，且gfpglags未置位忽略水位线的标志
 	 * 则转至deactivate_slab
 	 * 
-	 * 向伙伴系统申请页时，会置位这些标志位
-	 * 若此时检测到未置位，说明当前slab对应的page被其他进程free了
+	 * new_slab分配新page时，若page是从预留内存分配，则置位PG_active
+	 * 
+	 * 此时PG_active被置位，说明page是从预留内存分配
+	 * 但是当前的gfpflags却并没有忽视水位线，说明此page是由其他分配行为产生的
+	 * 
+	 * 当前的分配行为并没有资格使用预留内存的page，所以将此page移动至kmem_cache_node中，
+	 * 当前分配行为使用其他的slab
 	 */
 	if (unlikely(!pfmemalloc_match_unsafe(page, gfpflags)))
 		goto deactivate_slab;
@@ -3179,7 +3230,7 @@ check_new_page:
 		}
 	}
 
-	// 若page的PG_active置位，且gfpglags未置位忽略水位线的标志
+	// 若page的PG_active置位，而gfpglags未置位忽略水位线的标志
 	if (unlikely(!pfmemalloc_match(page, gfpflags)))
 		/*
 		 * For !pfmemalloc_match() case we don't load freelist so that
@@ -3469,7 +3520,8 @@ EXPORT_SYMBOL(kmem_cache_alloc_node_trace);
 #endif
 #endif	/* CONFIG_NUMA */
 
-/*
+/* slub 慢速free路径
+ *
  * Slow path handling. This may still be called frequently since objects
  * have a longer lifetime than the cpu slabs in most processing loads.
  *
@@ -3494,6 +3546,7 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 	if (kfence_free(head))
 		return;
 
+	// free_debug_processing通过init_object清除对象中的无用信息，使对象返回初始状态
 	if (kmem_cache_debug(s) &&
 	    !free_debug_processing(s, page, head, tail, cnt, addr))
 		return;
@@ -3503,14 +3556,29 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 			spin_unlock_irqrestore(&n->list_lock, flags);
 			n = NULL;
 		}
+
+		// 获取 slub 中的空闲对象列表
 		prior = page->freelist;
+
+		// 获取slub的对象数
 		counters = page->counters;
+
+		// 将tail的freeptr设置为prior
 		set_freepointer(s, tail, prior);
+
+		// 将原有 slab 的相应属性赋值给 new page
 		new.counters = counters;
 		was_frozen = new.frozen;
 		new.inuse -= cnt;
+
+		/** 
+		 * !new.inuse = empty slub 
+		 * !prior = 从 full slub 变成 partial slub
+		 * !was_frozen = slub 不在 cpu 本地缓存
+		*/
 		if ((!new.inuse || !prior) && !was_frozen) {
 
+			// 若kmem_cache_cpu有partial列表 且 当前slub为partial slub
 			if (kmem_cache_has_cpu_partial(s) && !prior) {
 
 				/*
@@ -3523,7 +3591,9 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 
 			} else { /* Needs to be taken off a list */
 
+				// 若kmem_cache_cpu无partial列表，则将slub直接释放回Node partial
 				n = get_node(s, page_to_nid(page));
+
 				/*
 				 * Speculatively acquire the list_lock.
 				 * If the cmpxchg does not succeed then we may
@@ -3540,11 +3610,12 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 	} while (!cmpxchg_double_slab(s, page,
 		prior, counters,
 		head, new.counters,
-		"__slab_free"));
+		"__slab_free")); // 更新page->freelist和page->counters
 
 	if (likely(!n)) {
 
-		if (likely(was_frozen)) {
+		// 若slub本来就处在cpu->partial列表中
+		if (likely(was_frozen)) { 
 			/*
 			 * The list lock was not taken therefore no list
 			 * activity can be necessary.
@@ -3554,6 +3625,10 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 			/*
 			 * If we just froze the page then put it onto the
 			 * per cpu partial list.
+			 * 
+			 * slub 原来不在 cpu 本地缓存的 partial 列表中
+			 * 但是该 slub 刚刚从 full slub 变为了 partial slub
+			 * 需要放入 cpu-> partial 列表中
 			 */
 			put_cpu_partial(s, page, 1);
 			stat(s, CPU_PARTIAL_FREE);
@@ -3562,12 +3637,16 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 		return;
 	}
 
+	// 若slub为空，且node partial列表满载，则直接释放回伙伴系统
 	if (unlikely(!new.inuse && n->nr_partial >= s->min_partial))
 		goto slab_empty;
 
 	/*
 	 * Objects left in the slab. If it was not on the partial list before
 	 * then add it.
+	 * 
+	 * 若 cpu 本地缓存中没有配置 partial 列表并且 slub 刚刚从 full slub 变为 partial slub
+	 * 将 slub 从 full_slub列表删除, 再插入到 kmem_cache_node partial列表中
 	 */
 	if (!kmem_cache_has_cpu_partial(s) && unlikely(!prior)) {
 		remove_full(s, n, page);
@@ -3577,8 +3656,9 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 	spin_unlock_irqrestore(&n->list_lock, flags);
 	return;
 
+// 将 empty slub 释放回伙伴系统
 slab_empty:
-	if (prior) {
+	if (prior) { // 若 slub 位于 node partial 列表上
 		/*
 		 * Slab on the partial list.
 		 */
@@ -3591,6 +3671,8 @@ slab_empty:
 
 	spin_unlock_irqrestore(&n->list_lock, flags);
 	stat(s, FREE_SLAB);
+
+	// 释放 slub 回伙伴系统
 	discard_slab(s, page);
 }
 
@@ -3633,12 +3715,15 @@ redo:
 	/* Same with comment on barrier() in slab_alloc_node() */
 	barrier();
 
+	// 若被释放对象属于CPU缓存slub
 	if (likely(page == c->page)) {
 #ifndef CONFIG_PREEMPT_RT
 		void **freelist = READ_ONCE(c->freelist);
 
+		// 将tail_obj中的freeptr设置为freelist
 		set_freepointer(s, tail_obj, freelist);
 
+		// 将head设置为新的freelist头节点
 		if (unlikely(!this_cpu_cmpxchg_double(
 				s->cpu_slab->freelist, s->cpu_slab->tid,
 				freelist, tid,
@@ -3673,11 +3758,20 @@ redo:
 		local_unlock(&s->cpu_slab->lock);
 #endif
 		stat(s, FREE_FASTPATH);
-	} else
+	} else {
+		// 若被释放对象不属于CPU缓存slub，进入慢速释放路径
 		__slab_free(s, page, head, tail_obj, cnt, addr);
-
+	}
+		
 }
 
+/**
+ * 参数 kmem_cache *s 表示释放对象所在的 slab cache，指定我们要将对象释放到哪里。
+ * 参数 page 表示释放对象所在的 slab，slab 在内核中使用 struct page 结构来表示。
+ * 参数 head 指向释放对象的虚拟内存地址（起始内存地址）。
+ * 该函数支持批量释放多个对象，参数 tail 指向批量释放对象中最后一个对象的虚拟内存地址。
+ * 参数 cnt 表示释放对象的个数，也是用于批量释放对象
+*/
 static __always_inline void slab_free(struct kmem_cache *s, struct page *page,
 				      void *head, void *tail, int cnt,
 				      unsigned long addr)
@@ -3697,12 +3791,18 @@ void ___cache_free(struct kmem_cache *cache, void *x, unsigned long addr)
 }
 #endif
 
+// 将对象释放回所属的slab cache
 void kmem_cache_free(struct kmem_cache *s, void *x)
 {
+	// 确保指定的是 slab cache : s 为对象真正所属的 slab cache
 	s = cache_from_obj(s, x);
+
 	if (!s)
 		return;
+
+	// 将对象释放回 slab cache 中
 	slab_free(s, virt_to_head_page(x), x, NULL, 1, _RET_IP_);
+
 	trace_kmem_cache_free(_RET_IP_, x, s->name);
 }
 EXPORT_SYMBOL(kmem_cache_free);
@@ -4579,9 +4679,12 @@ int __kmem_cache_shutdown(struct kmem_cache *s)
 	struct kmem_cache_node *n;
 
 	flush_all_cpus_locked(s);
-	/* Attempt to free all objects */
+	/** Attempt to free all objects 
+	 * 遍历每个node partial，释放slub至伙伴系统
+	*/
 	for_each_kmem_cache_node(s, node, n) {
 		free_partial(s, n);
+		// 若未完全释放
 		if (n->nr_partial || slabs_node(s, node))
 			return 1;
 	}

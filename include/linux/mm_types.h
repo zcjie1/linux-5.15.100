@@ -147,8 +147,8 @@ struct page {
 				struct {	/* Partial pages */
 					struct page *next;
 #ifdef CONFIG_64BIT
-					int pages;	/* Nr of pages left */
-					int pobjects;	/* Approximate count 表示 slab 中拥有的特定类型的对象个数 */
+					int pages;	/* Nr of pages left——slab_list上的剩余页数 */
+					int pobjects;	/* Approximate count 表示 slab_list 中拥有的空闲对象个数 */
 #else
 					short int pages;
 					short int pobjects;
