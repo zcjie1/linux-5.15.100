@@ -311,7 +311,7 @@ static __always_inline int ffs(int x)
 }
 
 /**
- * fls - find last set bit in word
+ * fls - find last set bit in word(找到最高置位)
  * @x: the word to search
  *
  * This is defined in a similar way as the libc and compiler builtin

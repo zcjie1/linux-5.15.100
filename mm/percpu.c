@@ -144,7 +144,10 @@ static size_t pcpu_chunk_struct_size __ro_after_init;
 static unsigned int pcpu_low_unit_cpu __ro_after_init;
 static unsigned int pcpu_high_unit_cpu __ro_after_init;
 
-/* the address of the first chunk which starts with the kernel static area */
+/** 
+ * the address of the first chunk which starts with the kernel static area
+ * percpu内存区基地址
+*/
 void *pcpu_base_addr __ro_after_init;
 
 static const int *pcpu_unit_map __ro_after_init;		/* cpu -> unit */
@@ -159,6 +162,8 @@ static const size_t *pcpu_group_sizes __ro_after_init;
  * The first chunk which always exists.  Note that unlike other
  * chunks, this one can be allocated and mapped in several different
  * ways and thus often doesn't live in the vmalloc area.
+ * 
+ * percpu dynamic内存区域描述结构体
  */
 struct pcpu_chunk *pcpu_first_chunk __ro_after_init;
 
@@ -166,12 +171,15 @@ struct pcpu_chunk *pcpu_first_chunk __ro_after_init;
  * Optional reserved chunk.  This chunk reserves part of the first
  * chunk and serves it for reserved allocations.  When the reserved
  * region doesn't exist, the following variable is NULL.
+ * 
+ * percpu reserve内存区域描述结构体
  */
 struct pcpu_chunk *pcpu_reserved_chunk __ro_after_init;
 
 DEFINE_SPINLOCK(pcpu_lock);	/* all internal data structures */
 static DEFINE_MUTEX(pcpu_alloc_mutex);	/* chunk create/destroy, [de]pop, map ext */
 
+// percpu dynamic内存区动态管理结构
 struct list_head *pcpu_chunk_lists __ro_after_init; /* chunk list slots */
 
 /* chunks which need their map areas extended, protected by pcpu_lock */
@@ -230,6 +238,7 @@ static bool pcpu_addr_in_chunk(struct pcpu_chunk *chunk, void *addr)
 	return addr >= start_addr && addr < end_addr;
 }
 
+// dynamic size -> slot 哈希函数
 static int __pcpu_size_to_slot(int size)
 {
 	int highbit = fls(size);	/* size is in bytes */
@@ -545,6 +554,9 @@ static void pcpu_chunk_move(struct pcpu_chunk *chunk, int slot)
 
 /**
  * pcpu_chunk_relocate - put chunk in the appropriate chunk slot
+ * 
+ * 将dynamic chunk放置在对应哈希值的pcpu_chunk_lists上
+ * 
  * @chunk: chunk of interest
  * @oslot: the previous slot it was on
  *
@@ -1327,6 +1339,9 @@ static void pcpu_init_md_blocks(struct pcpu_chunk *chunk)
 
 /**
  * pcpu_alloc_first_chunk - creates chunks that serve the first chunk
+ * 
+ * 创建第一块 reserved chunk 或 第一块dynamic chunk
+ * 
  * @tmp_addr: the start of the region served
  * @map_size: size of the region served
  *
@@ -2722,7 +2737,11 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	pcpu_sidelined_slot = __pcpu_size_to_slot(pcpu_unit_size) + 1;
 	pcpu_free_slot = pcpu_sidelined_slot + 1;
 	pcpu_to_depopulate_slot = pcpu_free_slot + 1;
+
+	// pcpu_nr_slots即为slot哈希桶数量
 	pcpu_nr_slots = pcpu_to_depopulate_slot + 1;
+
+	// 创建dynamic_size的动态管理结构
 	pcpu_chunk_lists = memblock_alloc(pcpu_nr_slots *
 					  sizeof(pcpu_chunk_lists[0]),
 					  SMP_CACHE_BYTES);
@@ -2730,6 +2749,7 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 		panic("%s: Failed to allocate %zu bytes\n", __func__,
 		      pcpu_nr_slots * sizeof(pcpu_chunk_lists[0]));
 
+	// 初始化dynamic_size的动态管理结构(哈希桶)
 	for (i = 0; i < pcpu_nr_slots; i++)
 		INIT_LIST_HEAD(&pcpu_chunk_lists[i]);
 
@@ -2766,9 +2786,14 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 		chunk = pcpu_alloc_first_chunk(tmp_addr, map_size);
 	}
 
-	/* link the first chunk in */
+	/** 
+	 * link the first chunk in
+	 * chunk为dynamic region的描述结构体
+	*/
 	pcpu_first_chunk = chunk;
 	pcpu_nr_empty_pop_pages = pcpu_first_chunk->nr_empty_pop_pages;
+
+	// 将第一块dynamic chunk放置在对应哈希值的pcpu_chunk_lists上
 	pcpu_chunk_relocate(pcpu_first_chunk, -1);
 
 	/* include all regions of the first chunk */
@@ -2996,6 +3021,8 @@ static struct pcpu_alloc_info * __init __flatten pcpu_build_alloc_info(
 
 #if defined(BUILD_EMBED_FIRST_CHUNK)
 /**
+ * 为每个CPU创建percpu存储区，并划分static_size，preserved_size和dynamic_size
+ * 
  * pcpu_embed_first_chunk - embed the first percpu chunk into bootmem
  * @reserved_size: the size of reserved percpu area in bytes
  * @dyn_size: minimum free size for dynamic allocation in bytes
@@ -3109,7 +3136,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 				continue;
 			}
 			/** copy and return the unused part
-			 * 将vmlinux的.data..percpu section拷贝到各个cpu的percpu内存块
+			 * 将vmlinux的.data..percpu section拷贝到各个cpu的percpu内存块的staic区域
 			 */
 			memcpy(ptr, __per_cpu_load, ai->static_size);
 			free_fn(ptr + size_sum, ai->unit_size - size_sum);
@@ -3126,6 +3153,8 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		ai->dyn_size, ai->unit_size);
 
 	// 将每个cpu的percpu area划分为三部分: static_size，preserved_size和dynamic_size
+	// 并将相关存储至相关结构体(pcpu_reserved_chunk 和 pcpu_first_chunk)
+	// base为cpu group内存区的起始地址
 	pcpu_setup_first_chunk(ai, base);
 	goto out_free;
 

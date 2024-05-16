@@ -94,8 +94,14 @@
 	extern __PCPU_ATTRS(sec) __typeof__(type) name;			\
 	__PCPU_ATTRS(sec) __weak __typeof__(type) name
 #else
-/*
+/**
  * Normal declaration and definition macros.
+ * 
+ * 静态定义percpu变量
+ * 
+ * type: 表示PERCPU变量的数据类型
+ * name: 表示PERCPU变量的名称
+ * sec: 表示PERCPU变量将在存储在内核哪个段中
  */
 #define DECLARE_PER_CPU_SECTION(type, name, sec)			\
 	extern __PCPU_ATTRS(sec) __typeof__(type) name
