@@ -1183,7 +1183,7 @@ DEFINE_IDTENTRY_SW(iret_error)
 }
 #endif
 
-// 系统异常处理函数设置
+// 系统异常处理函数设置, 系统调用初始化
 void __init trap_init(void)
 {
 	/* Init cpu_entry_area before IST entries are set up */
@@ -1194,7 +1194,9 @@ void __init trap_init(void)
 
 	/* Initialize TSS before setting up traps so ISTs work */
 	cpu_init_exception_handling();
-	/* Setup traps as cpu_init() might #GP */
+
+	/* Setup traps as cpu_init() might #GP 异常处理函数设置*/
 	idt_setup_traps();
-	cpu_init();
+
+	cpu_init();// 系统调用初始化
 }

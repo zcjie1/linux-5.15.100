@@ -82,20 +82,30 @@
  * When user can change pt_regs->foo always force IRET. That is because
  * it deals with uncanonical addresses better. SYSRET has trouble
  * with them due to bugs in both AMD and Intel CPUs.
+ * 
+ * 系统调用函数入口
  */
 
 SYM_CODE_START(entry_SYSCALL_64)
 	UNWIND_HINT_ENTRY
 
+	/* 保存程序用户态现场，进入内核态 */
 	swapgs
-	/* tss.sp2 is scratch space. */
+	/* tss.sp2 is scratch space. 保存用户栈地址到寄存器 */
 	movq	%rsp, PER_CPU_VAR(cpu_tss_rw + TSS_sp2)
+
+	/* 更改页表基地址 */
 	SWITCH_TO_KERNEL_CR3 scratch_reg=%rsp
+
+	/* 获取内核栈顶地址，放入 %rsp 寄存器。 */
 	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rsp
 
 SYM_INNER_LABEL(entry_SYSCALL_64_safe_stack, SYM_L_GLOBAL)
 
-	/* Construct struct pt_regs on stack */
+	/* 
+	 * Construct struct pt_regs on stack 
+	 * 保存寄存器数据到内核数据结构（struct pt_regs）
+	*/
 	pushq	$__USER_DS				/* pt_regs->ss */
 	pushq	PER_CPU_VAR(cpu_tss_rw + TSS_sp2)	/* pt_regs->sp */
 	pushq	%r11					/* pt_regs->flags */
@@ -106,10 +116,11 @@ SYM_INNER_LABEL(entry_SYSCALL_64_after_hwframe, SYM_L_GLOBAL)
 
 	PUSH_AND_CLEAR_REGS rax=$-ENOSYS
 
-	/* IRQs are off. */
+	/* IRQs are off. rsp即为pt_regs的指针 */
 	movq	%rsp, %rdi
+
 	/* Sign extend the lower 32bit as syscall numbers are treated as int */
-	movslq	%eax, %rsi
+	movslq	%eax, %rsi /* 系统调用号 */
 
 	/* clobbers %rax, make sure it is after saving the syscall nr */
 	IBRS_ENTER

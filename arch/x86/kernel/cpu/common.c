@@ -1900,6 +1900,8 @@ DEFINE_PER_CPU(unsigned long, cpu_current_top_of_stack) = TOP_OF_INIT_STACK;
 void syscall_init(void)
 {
 	wrmsr(MSR_STAR, 0, (__USER32_CS << 16) | __KERNEL_CS);
+
+	// 存储 syscall 指令入口函数
 	wrmsrl(MSR_LSTAR, (unsigned long)entry_SYSCALL_64);
 
 #ifdef CONFIG_IA32_EMULATION
@@ -2125,7 +2127,7 @@ void cpu_init(void)
 	if (IS_ENABLED(CONFIG_X86_64)) {
 		loadsegment(fs, 0);
 		memset(cur->thread.tls_array, 0, GDT_ENTRY_TLS_ENTRIES * 8);
-		syscall_init();
+		syscall_init(); // 系统调用初始化
 
 		wrmsrl(MSR_FS_BASE, 0);
 		wrmsrl(MSR_KERNEL_GS_BASE, 0);

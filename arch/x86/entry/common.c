@@ -47,6 +47,11 @@ static __always_inline bool do_syscall_x64(struct pt_regs *regs, int nr)
 
 	if (likely(unr < NR_syscalls)) {
 		unr = array_index_nospec(unr, NR_syscalls);
+
+		/* 
+		 * 通过系统调用跳转表，调用系统调用号对应的函数。
+         * 函数返回值保存在 regs->ax 里，最后将这个值，保存到 rax 寄存器传递到用户空间
+		 */
 		regs->ax = sys_call_table[unr](regs);
 		return true;
 	}

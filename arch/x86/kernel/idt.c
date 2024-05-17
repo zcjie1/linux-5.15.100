@@ -228,6 +228,7 @@ void __init idt_setup_early_traps(void)
 
 /**
  * idt_setup_traps - Initialize the idt table with default traps
+ * 异常处理函数向量表设置
  */
 void __init idt_setup_traps(void)
 {

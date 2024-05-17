@@ -7,7 +7,7 @@ PERF_HAVE_ARCH_REGS_QUERY_REGISTER_OFFSET := 1
 PERF_HAVE_JITDUMP := 1
 
 ###
-# Syscall table generation
+# Syscall table generation 生成系统调用表
 #
 
 generated := $(OUTPUT)arch/x86/include/generated
