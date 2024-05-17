@@ -330,15 +330,26 @@ static void pcpu_depopulate_chunk(struct pcpu_chunk *chunk,
 	pcpu_free_pages(chunk, pages, page_start, page_end);
 }
 
+// 创建新chunk
 static struct pcpu_chunk *pcpu_create_chunk(gfp_t gfp)
 {
 	struct pcpu_chunk *chunk;
 	struct vm_struct **vms;
 
+	/** 分配新chunk的管理结构
+	 * 
+	 * 分配内存超过PAGESIZE，使用vmalloc
+	 * 否则使用kzalloc
+	*/
 	chunk = pcpu_alloc_chunk(gfp);
 	if (!chunk)
 		return NULL;
 
+	/** 分配新chunk的数据区
+	 * 
+	 * 从vmalloc区域为percpu分配虚拟内存区域
+	 * 以group为单位进行分配，将分配的vms[group]记录在chunk->data中
+	*/
 	vms = pcpu_get_vm_areas(pcpu_group_offsets, pcpu_group_sizes,
 				pcpu_nr_groups, pcpu_atom_size);
 	if (!vms) {

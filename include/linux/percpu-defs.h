@@ -239,6 +239,7 @@ do {									\
 #define SHIFT_PERCPU_PTR(__p, __offset)					\
 	RELOC_HIDE((typeof(*(__p)) __kernel __force *)(__p), (__offset))
 
+// 访问percpu变量，返回变量地址
 #define per_cpu_ptr(ptr, cpu)						\
 ({									\
 	__verify_pcpu_ptr(ptr);						\
@@ -280,6 +281,9 @@ do {									\
 /*
  * Must be an lvalue. Since @var must be a simple identifier,
  * we force a syntax error here if it isn't.
+ * 
+ * 关闭本地抢占，获取当前cpu的PERCPU变量本身(由于是宏定义)
+ * 需要配合&取地址，才可以得到PERCPU变量的指针
  */
 #define get_cpu_var(var)						\
 (*({									\
@@ -297,6 +301,7 @@ do {									\
 	preempt_enable();						\
 } while (0)
 
+//关闭本地抢占，获取当前cpu的PERCPU变量的地址
 #define get_cpu_ptr(var)						\
 ({									\
 	preempt_disable();						\

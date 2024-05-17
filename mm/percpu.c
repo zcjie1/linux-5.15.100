@@ -418,6 +418,10 @@ static void pcpu_next_md_free_region(struct pcpu_chunk *chunk, int *bit_off,
 
 /**
  * pcpu_next_fit_region - finds fit areas for a given allocation request
+ * 
+ * 寻找有足够连续内存的block
+ * 更新bits为block的size_bits，bit_off为block距离chunk的地址偏移
+ * 
  * @chunk: chunk of interest
  * @alloc_bits: size of allocation
  * @align: alignment of area (max PAGE_SIZE)
@@ -555,7 +559,7 @@ static void pcpu_chunk_move(struct pcpu_chunk *chunk, int slot)
 /**
  * pcpu_chunk_relocate - put chunk in the appropriate chunk slot
  * 
- * 将dynamic chunk放置在对应哈希值的pcpu_chunk_lists上
+ * 将dynamic chunk 或 reserved chunk 放置在对应哈希值的pcpu_chunk_lists上
  * 
  * @chunk: chunk of interest
  * @oslot: the previous slot it was on
@@ -1140,6 +1144,7 @@ static int pcpu_find_block_fit(struct pcpu_chunk *chunk, int alloc_bits,
 		bits = 0;
 	}
 
+	// 若block的偏移到了chunk的末尾
 	if (bit_off == pcpu_chunk_map_bits(chunk))
 		return -1;
 
@@ -1238,6 +1243,8 @@ static int pcpu_alloc_area(struct pcpu_chunk *chunk, int alloc_bits,
 	 */
 	end = min_t(int, start + alloc_bits + PCPU_BITMAP_BLOCK_BITS,
 		    pcpu_chunk_map_bits(chunk));
+	
+	// 寻找可分配区域的偏移
 	bit_off = pcpu_find_zero_area(chunk->alloc_map, end, start, alloc_bits,
 				      align_mask, &area_off, &area_bits);
 	if (bit_off >= end)
@@ -1246,7 +1253,7 @@ static int pcpu_alloc_area(struct pcpu_chunk *chunk, int alloc_bits,
 	if (area_bits)
 		pcpu_block_update_scan(chunk, area_off, area_bits);
 
-	/* update alloc map */
+	/* update alloc map 分配对应内存，即更新bitmap*/
 	bitmap_set(chunk->alloc_map, bit_off, alloc_bits);
 
 	/* update boundary map */
@@ -1453,6 +1460,10 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
 	return chunk;
 }
 
+/**
+ * 分配内存超过PAGESIZE，使用vmalloc
+ * 否则使用kzalloc
+*/
 static struct pcpu_chunk *pcpu_alloc_chunk(gfp_t gfp)
 {
 	struct pcpu_chunk *chunk;
@@ -1720,7 +1731,10 @@ static void pcpu_memcg_free_hook(struct pcpu_chunk *chunk, int off, size_t size)
 #endif /* CONFIG_MEMCG_KMEM */
 
 /**
- * pcpu_alloc - the percpu allocator
+ * pcpu_alloc - the percpu allocator——动态定义PERCPU变量
+ * 
+ * 当置位reserved时，优先从reserved region分配内存(用于动态加载模块)
+ * 
  * @size: size of area to allocate in bytes
  * @align: alignment of area (max PAGE_SIZE)
  * @reserved: allocate from the reserved chunk if available
@@ -1749,7 +1763,9 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 	void __percpu *ptr;
 	size_t bits, bit_align;
 
+	// 合并当前进程的标志位
 	gfp = current_gfp_context(gfp);
+
 	/* whitelisted flags that can be passed to the backing allocators */
 	pcpu_gfp = gfp & (GFP_KERNEL | __GFP_NORETRY | __GFP_NOWARN);
 	is_atomic = (gfp & GFP_KERNEL) != GFP_KERNEL;
@@ -1794,16 +1810,26 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 
 	spin_lock_irqsave(&pcpu_lock, flags);
 
-	/* serve reserved allocations from the reserved chunk if available */
+	/** 
+	 * serve reserved allocations from the reserved chunk if available 
+	 * 若reserved置位，且reserved_chunk存在，优先从reserved_chunk分配
+	*/
 	if (reserved && pcpu_reserved_chunk) {
 		chunk = pcpu_reserved_chunk;
 
+		// 从 reserved_chunk中寻找合适的可分配block并返回相对chunk的偏移
+		// 使用struct pcpu_block_md结构体辅助实现
 		off = pcpu_find_block_fit(chunk, bits, bit_align, is_atomic);
 		if (off < 0) {
 			err = "alloc from reserved chunk failed";
 			goto fail_unlock;
 		}
 
+		/**
+		 * 从chunk找到的block中分配内存，即更新相应的bitmap
+		 * 并将分配后的chunk移动到哈希表pcpu_slot[slot]的新的slot中
+		 * 最后返回分配的区域距离chunk的起始地址的偏移off
+		*/
 		off = pcpu_alloc_area(chunk, bits, bit_align, off);
 		if (off >= 0)
 			goto area_found;
@@ -1813,19 +1839,32 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 	}
 
 restart:
-	/* search through normal chunks */
+	/** search through normal chunks 
+	 * 
+	 * pcpu_slot[slot]是一个链表头，挂的是chunk->free_size为2^slot到2^slot+1的chunk(类似伙伴系统)
+	 * 
+	 * 根据size的最高bit算出slot，到pcpu_slot[slot]以及更高阶slot中去查找可用的chunk
+	 * 然后到选定的chunk中去尝试分配per-cpu内存
+	*/
 	for (slot = pcpu_size_to_slot(size); slot <= pcpu_free_slot; slot++) {
 		list_for_each_entry_safe(chunk, next, &pcpu_chunk_lists[slot],
 					 list) {
+			
+			// 遍历pcpu_slot[slot]中的chunk，找到合适的block，并返回偏移地址
 			off = pcpu_find_block_fit(chunk, bits, bit_align,
 						  is_atomic);
+			
+			// 若查找block失败，将对应的chunk边缘化(因为内存不足)
 			if (off < 0) {
 				if (slot < PCPU_SLOT_FAIL_THRESHOLD)
 					pcpu_chunk_move(chunk, 0);
 				continue;
 			}
 
+			// 从合适的chunk-block中分配内存
 			off = pcpu_alloc_area(chunk, bits, bit_align, off);
+
+			// 若分配成功，将chunk插入到合适的pcpu_slot链表中
 			if (off >= 0) {
 				pcpu_reintegrate_chunk(chunk);
 				goto area_found;
@@ -1839,13 +1878,21 @@ restart:
 	 * No space left.  Create a new chunk.  We don't want multiple
 	 * tasks to create chunks simultaneously.  Serialize and create iff
 	 * there's still no empty chunk after grabbing the mutex.
+	 * 
+	 * 走到这一步，说明内存已经严重不足，分配失败
+	 * 需要从伙伴系统分配更多的内存用作percpu存储区
 	 */
+
+	// 伙伴系统内存分配会消耗较长时间，若为原子分配，直接返回失败
 	if (is_atomic) {
 		err = "atomic alloc failed, no space left";
 		goto fail;
 	}
 
+	// pcpu_free_slot为最后一个slot
 	if (list_empty(&pcpu_chunk_lists[pcpu_free_slot])) {
+
+		// 分配新chunk
 		chunk = pcpu_create_chunk(pcpu_gfp);
 		if (!chunk) {
 			err = "failed to allocate new chunk";
@@ -1853,28 +1900,42 @@ restart:
 		}
 
 		spin_lock_irqsave(&pcpu_lock, flags);
+
+		// 将chunk插入到合适的pcpu_slot链表中
 		pcpu_chunk_relocate(chunk, -1);
 	} else {
 		spin_lock_irqsave(&pcpu_lock, flags);
 	}
 
+	// 分配新chunk后重试
 	goto restart;
 
 area_found:
 	pcpu_stats_area_alloc(chunk, size);
 	spin_unlock_irqrestore(&pcpu_lock, flags);
 
-	/* populate if not all pages are already there */
+	/** populate if not all pages are already there
+	 * 
+	 * 此处仅针对未分配物理页的虚拟内存
+	 * 
+	 * 由于在pcpu_create_chunk()函数中只分配了虚拟内存
+	 * 此处需要从buddy系统中分配物理page
+	 * 
+	 * 伙伴系统页分配会消耗较长时间，只能非原子操作才可行
+	*/
 	if (!is_atomic) {
 		unsigned int page_start, page_end, rs, re;
 
+		/* 将起始、结束地址转换为对应的page index */
 		page_start = PFN_DOWN(off);
 		page_end = PFN_UP(off + size);
 
+		// 寻找chunk的[page_start,page_end)中没有映射物理内存的内存区
 		bitmap_for_each_clear_region(chunk->populated, rs, re,
 					     page_start, page_end) {
 			WARN_ON(chunk->immutable);
 
+			// 从buddy中分配物理page，并与相应虚拟地址映射
 			ret = pcpu_populate_chunk(chunk, rs, re, pcpu_gfp);
 
 			spin_lock_irqsave(&pcpu_lock, flags);
@@ -1883,6 +1944,8 @@ area_found:
 				err = "failed to populate";
 				goto fail_unlock;
 			}
+
+			// 将chunk->populated已映射过物理内存的区域设置为1
 			pcpu_chunk_populated(chunk, rs, re);
 			spin_unlock_irqrestore(&pcpu_lock, flags);
 		}
@@ -1893,10 +1956,11 @@ area_found:
 	if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_LOW)
 		pcpu_schedule_balance_work();
 
-	/* clear the areas and return address relative to base address */
+	/* clear the areas and return address relative to base address 清零内存 */
 	for_each_possible_cpu(cpu)
 		memset((void *)pcpu_chunk_addr(chunk, cpu, 0) + off, 0, size);
 
+	// 将percpu变量（ptr）在对应cpu上的偏移作为地址返回
 	ptr = __addr_to_pcpu_ptr(chunk->base_addr + off);
 	kmemleak_alloc_percpu(ptr, size, gfp);
 
@@ -2240,6 +2304,12 @@ end_chunk:
 
 /**
  * pcpu_balance_workfn - manage the amount of free chunks and populated pages
+ * 
+ * 维持系统中空闲的已映射物理页面的虚拟页面数量不低于2个(PCPU_EMPTY_POP_PAGES_LOW) 
+ * 
+ * 当系统中存在多于一个完全空闲的chunk时
+ * 将多出的chunk及其管理的percpu内存区域（虚拟内存与物理内存）释放回收
+ * 
  * @work: unused
  *
  * For each chunk type, manage the number of fully free chunks and the number of
@@ -2268,7 +2338,7 @@ static void pcpu_balance_workfn(struct work_struct *work)
 }
 
 /**
- * free_percpu - free percpu area
+ * free_percpu - free percpu area——释放percpu变量
  * @ptr: pointer to area to free
  *
  * Free percpu area @ptr.

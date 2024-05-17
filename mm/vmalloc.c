@@ -3540,6 +3540,7 @@ pvm_determine_end_from_reverse(struct vmap_area **va, unsigned long align)
 
 /**
  * pcpu_get_vm_areas - allocate vmalloc areas for percpu allocator
+ * 
  * @offsets: array containing offset of each area
  * @sizes: array containing size of each area
  * @nr_vms: the number of areas to allocate
