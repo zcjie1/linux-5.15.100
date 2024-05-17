@@ -5011,6 +5011,8 @@ context_switch(struct rq *rq, struct task_struct *prev,
 		 * The below provides this either through switch_mm(), or in
 		 * case 'prev->active_mm == next->mm' through
 		 * finish_task_switch()'s mmdrop().
+		 * 
+		 * 用户进程虚拟内存空间切换(当前在内核，不影响下面代码执行)
 		 */
 		switch_mm_irqs_off(prev->active_mm, next->mm, next);
 

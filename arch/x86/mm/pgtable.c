@@ -427,6 +427,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	pmd_t *u_pmds[MAX_PREALLOCATED_USER_PMDS];
 	pmd_t *pmds[MAX_PREALLOCATED_PMDS];
 
+	// 为子进程分配顶级页表
 	pgd = _pgd_alloc();
 
 	if (pgd == NULL)
@@ -450,7 +451,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	 */
 	spin_lock(&pgd_lock);
 
+	// 拷贝内核页表到子进程中
 	pgd_ctor(mm, pgd);
+	
 	pgd_prepopulate_pmd(mm, pgd, pmds);
 	pgd_prepopulate_user_pmd(mm, pgd, u_pmds);
 

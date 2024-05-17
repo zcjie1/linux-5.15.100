@@ -277,6 +277,7 @@ static void load_new_mm_cr3(pgd_t *pgdir, u16 new_asid, bool need_flush)
 {
 	unsigned long new_mm_cr3;
 
+	// 将pgdir转换为物理地址
 	if (need_flush) {
 		invalidate_user_asid(new_asid);
 		new_mm_cr3 = build_cr3(pgdir, new_asid);

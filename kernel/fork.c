@@ -1077,6 +1077,7 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 		mm->def_flags = 0;
 	}
 
+	// 为子进程分配顶级页表起始地址 pgd
 	if (mm_alloc_pgd(mm))
 		goto fail_nopgd;
 
@@ -1452,9 +1453,11 @@ static struct mm_struct *dup_mm(struct task_struct *tsk,
 
 	memcpy(mm, oldmm, sizeof(*mm));
 
+	// 为子进程分配顶级页表起始地址并赋值给 mm_struct->pgd
 	if (!mm_init(mm, tsk, mm->user_ns))
 		goto fail_nomem;
 
+	// 拷贝父进程的虚拟内存空间中的内容以及页表到子进程中
 	err = dup_mmap(mm, oldmm);
 	if (err)
 		goto free_pt;
