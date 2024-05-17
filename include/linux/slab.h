@@ -256,6 +256,11 @@ static inline void __check_heap_object(const void *ptr, unsigned long n,
 /*
  * SLUB directly allocates requests fitting in to an order-1 page
  * (PAGE_SIZE*2).  Larger requests are passed to the page allocator.
+ * 
+ * slub 最大支持分配 2页 大小的对象
+ * 对应的 kmalloc 内存池中内存块尺寸最大就是 2页
+ * 
+ * 超过 2页 大小的内存块直接向伙伴系统申请
  */
 #define KMALLOC_SHIFT_HIGH	(PAGE_SHIFT + 1)
 #define KMALLOC_SHIFT_MAX	(MAX_ORDER + PAGE_SHIFT - 1)
@@ -309,6 +314,8 @@ static inline void __check_heap_object(const void *ptr, unsigned long n,
  * KMALLOC_NORMAL can contain only unaccounted objects whereas KMALLOC_CGROUP
  * is for accounted but unreclaimable and non-dma objects. All the other
  * kmem caches can have both accounted and unaccounted objects.
+ * 
+ * kmalloc内存池类型
  */
 enum kmalloc_cache_type {
 	KMALLOC_NORMAL = 0,
@@ -521,7 +528,7 @@ static __always_inline void *kmalloc_large(size_t size, gfp_t flags)
 }
 
 /**
- * kmalloc - allocate memory
+ * kmalloc - allocate memory——kmalloc分配内存
  * @size: how many bytes of memory are required.
  * @flags: the type of memory to allocate.
  *

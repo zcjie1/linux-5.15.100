@@ -773,6 +773,7 @@ struct kmem_cache *__init create_kmalloc_cache(const char *name,
 	return s;
 }
 
+// kmalloc内存池
 struct kmem_cache *
 kmalloc_caches[NR_KMALLOC_TYPES][KMALLOC_SHIFT_HIGH + 1] __ro_after_init =
 { /* initialization for https://bugs.llvm.org/show_bug.cgi?id=42570 */ };
@@ -783,6 +784,8 @@ EXPORT_SYMBOL(kmalloc_caches);
  * kmalloc array. This is necessary for slabs < 192 since we have non power
  * of two cache sizes there. The size of larger slabs can be determined using
  * fls.
+ * 
+ * size_index[24] 数组中每个元素表示最佳合适尺寸的通用 slab cache 在 kmalloc_info[] 数组中的索引
  */
 static u8 size_index[24] __ro_after_init = {
 	3,	/* 8 */
@@ -863,6 +866,8 @@ struct kmem_cache *kmalloc_slab(size_t size, gfp_t flags)
  * kmalloc_info[] is to make slub_debug=,kmalloc-xx option work at boot time.
  * kmalloc_index() supports up to 2^25=32MB, so the final entry of the table is
  * kmalloc-32M.
+ * 
+ * kmalloc内存池
  */
 const struct kmalloc_info_struct kmalloc_info[] __initconst = {
 	INIT_KMALLOC_INFO(0, 0),
@@ -989,9 +994,13 @@ void __init create_kmalloc_caches(slab_flags_t flags)
 			 * These have to be created immediately after the
 			 * earlier power of two caches
 			 */
+
+			// 创建 kmalloc-96 内存池管理 96B 尺寸的内存块
 			if (KMALLOC_MIN_SIZE <= 32 && i == 6 &&
 					!kmalloc_caches[type][1])
 				new_kmalloc_cache(1, type, flags);
+			
+			// 创建 kmalloc-192 内存池管理 192B 尺寸的内存块
 			if (KMALLOC_MIN_SIZE <= 64 && i == 7 &&
 					!kmalloc_caches[type][2])
 				new_kmalloc_cache(2, type, flags);
@@ -1002,6 +1011,7 @@ void __init create_kmalloc_caches(slab_flags_t flags)
 	slab_state = UP;
 
 #ifdef CONFIG_ZONE_DMA
+	// 如果配置了 DMA 内存区域，则需要为该区域也创建对应尺寸的内存池
 	for (i = 0; i <= KMALLOC_SHIFT_HIGH; i++) {
 		struct kmem_cache *s = kmalloc_caches[KMALLOC_NORMAL][i];
 

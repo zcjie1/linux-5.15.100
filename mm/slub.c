@@ -4778,14 +4778,18 @@ void *__kmalloc(size_t size, gfp_t flags)
 	struct kmem_cache *s;
 	void *ret;
 
+	// 若分配size过大，直接从buddy系统分配
 	if (unlikely(size > KMALLOC_MAX_CACHE_SIZE))
 		return kmalloc_large(size, flags);
 
+	// 在 kmalloc_caches 缓存中选择合适尺寸的内存池
 	s = kmalloc_slab(size, flags);
 
+	// size为0
 	if (unlikely(ZERO_OR_NULL_PTR(s)))
 		return s;
 
+	// 向选取的 slab cache 申请内存块
 	ret = slab_alloc(s, flags, _RET_IP_, size);
 
 	trace_kmalloc(_RET_IP_, ret, size, s->size, flags);
@@ -5240,7 +5244,11 @@ void __init kmem_cache_init(void)
 	/* 以下为 kmalloc 初始化进程  */
 
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
+
+	// 初始化size_index数组
 	setup_kmalloc_cache_index_table();
+
+	// 创建kmalloc内存池，并赋值给kmalloc_caches数组元素
 	create_kmalloc_caches(0);
 
 	/* Setup random freelists for each cache */
