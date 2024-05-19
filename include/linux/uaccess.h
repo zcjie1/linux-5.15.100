@@ -1,4 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/** 
+ * SPDX-License-Identifier: GPL-2.0 
+ * 
+ * 用户空间操作函数合集
+*/
 #ifndef __LINUX_UACCESS_H__
 #define __LINUX_UACCESS_H__
 
@@ -185,6 +189,7 @@ extern __must_check unsigned long
 _copy_to_user(void __user *, const void *, unsigned long);
 #endif
 
+// 将数据块从用户空间复制到内核
 static __always_inline unsigned long __must_check
 copy_from_user(void *to, const void __user *from, unsigned long n)
 {
@@ -193,6 +198,7 @@ copy_from_user(void *to, const void __user *from, unsigned long n)
 	return n;
 }
 
+// 将数据块从内核复制到用户空间
 static __always_inline unsigned long __must_check
 copy_to_user(void __user *to, const void *from, unsigned long n)
 {
