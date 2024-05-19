@@ -540,19 +540,37 @@ unsigned long vm_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long flag, unsigned long pgoff)
 {
 	unsigned long ret;
+
+	// 获取进程虚拟内存空间
 	struct mm_struct *mm = current->mm;
+
+	// 是否需要为映射的 VMA，提前分配物理内存页，避免后续的缺页
+	// 取决于 flag 是否设置了 MAP_POPULATE 或者 MAP_LOCKED
 	unsigned long populate;
+
 	LIST_HEAD(uf);
 
+	// 内核安全相关hook点
 	ret = security_mmap_file(file, prot, flag);
+
 	if (!ret) {
+
+		// 对进程虚拟内存空间加写锁保护，防止多线程并发修改
 		if (mmap_write_lock_killable(mm))
 			return -EINTR;
+		
+		// 开始 mmap 内存映射，在进程虚拟内存空间中分配一段 vma，并建立相关映射关系
+		// 返回值ret为虚拟内存区域的起始地址
 		ret = do_mmap(file, addr, len, prot, flag, pgoff, &populate,
 			      &uf);
+		
+		// 释放写锁
 		mmap_write_unlock(mm);
+
 		userfaultfd_unmap_complete(mm, &uf);
+
 		if (populate)
+			// 为 [ret , ret + populate] 这段虚拟内存立即分配物理内存
 			mm_populate(ret, populate);
 	}
 	return ret;
@@ -976,29 +994,42 @@ int __vm_enough_memory(struct mm_struct *mm, long pages, int cap_sys_admin)
 {
 	long allowed;
 
+	// 增加vm_committed_as计数
 	vm_acct_memory(pages);
 
 	/*
 	 * Sometimes we want to use more memory than we have
+	 * OVERCOMMIT_ALWAYS 表示无论应用进程申请多大的虚拟内存都可行
 	 */
 	if (sysctl_overcommit_memory == OVERCOMMIT_ALWAYS)
 		return 0;
 
+	// OVERCOMMIT_GUESS 则相对 always 策略相对保守
+	// 若申请的虚拟内存不超过(物理内存+swap分区)，则成功
 	if (sysctl_overcommit_memory == OVERCOMMIT_GUESS) {
 		if (pages > totalram_pages() + total_swap_pages)
 			goto error;
 		return 0;
 	}
 
+	// 计算OVERCOMMIT_NEVER模式允许申请的虚拟内存量
 	allowed = vm_commit_limit();
+
 	/*
 	 * Reserve some for root
+	 * cap_sys_admin 表示申请内存的进程拥有 root 权限
 	 */
 	if (!cap_sys_admin)
+		// 为 root 进程保存一些内存
 		allowed -= sysctl_admin_reserve_kbytes >> (PAGE_SHIFT - 10);
 
 	/*
 	 * Don't let a single process grow so big a user can't recover
+	 * 
+	 * 可通过 /proc/sys/vm/user_reserve_kbytes 来配置
+	 * 
+	 * 用于在紧急情况下，用户恢复系统，比如系统卡死
+	 * 用户主动 kill 资源消耗比较大的进程，这个动作需要预留一些 user_reserve 内存
 	 */
 	if (mm) {
 		long reserve = sysctl_user_reserve_kbytes >> (PAGE_SHIFT - 10);
@@ -1006,9 +1037,11 @@ int __vm_enough_memory(struct mm_struct *mm, long pages, int cap_sys_admin)
 		allowed -= min_t(long, mm->total_vm / 32, reserve);
 	}
 
+	// Committed_AS （系统中所有进程已经申请的虚拟内存总量 + 本次 mmap 申请的）不可以超过 CommitLimit（allowed）
 	if (percpu_counter_read_positive(&vm_committed_as) < allowed)
 		return 0;
 error:
+	// 分配失败，减少vm_committed_as计数
 	vm_unacct_memory(pages);
 
 	return -ENOMEM;

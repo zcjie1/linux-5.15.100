@@ -656,6 +656,7 @@ out:
 	return error;
 }
 
+// mprotect系统调用——修改虚拟映射区权限
 SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
 		unsigned long, prot)
 {

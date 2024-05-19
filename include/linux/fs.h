@@ -459,7 +459,9 @@ int pagecache_write_end(struct file *, struct address_space *mapping,
  */
 struct address_space {
 	struct inode		*host;
-	struct xarray		i_pages;
+
+	struct xarray		i_pages; // page cache
+
 	struct rw_semaphore	invalidate_lock;
 	gfp_t			gfp_mask;
 	atomic_t		i_mmap_writable;
@@ -467,7 +469,12 @@ struct address_space {
 	/* number of thp, only for non-shmem files */
 	atomic_t		nr_thps;
 #endif
+	/**
+	 * 文件与 vma 反向映射的核心数据结构，i_mmap 也是一颗红黑树
+	 * 所有进程的地址空间中，只要与该文件发生映射的 vma 均挂在 i_mmap 中
+	*/
 	struct rb_root_cached	i_mmap;
+
 	struct rw_semaphore	i_mmap_rwsem;
 	unsigned long		nrpages;
 	pgoff_t			writeback_index;
@@ -635,7 +642,7 @@ struct inode {
 
 	const struct inode_operations	*i_op;
 	struct super_block	*i_sb;
-	struct address_space	*i_mapping;
+	struct address_space	*i_mapping; // 指向文件的page cache
 
 #ifdef CONFIG_SECURITY
 	void			*i_security;
@@ -969,8 +976,8 @@ struct file {
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
 	struct path		f_path;
-	struct inode		*f_inode;	/* cached value */
-	const struct file_operations	*f_op;
+	struct inode		*f_inode;	/* cached value 每个文件对应一个inode结构体*/
+	const struct file_operations	*f_op; // 文件相关操作
 
 	/*
 	 * Protects f_ep, f_flags.
@@ -2019,7 +2026,14 @@ struct file_operations {
 	__poll_t (*poll) (struct file *, struct poll_table_struct *);
 	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
 	long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
-	int (*mmap) (struct file *, struct vm_area_struct *);
+
+	/**
+	 * 用于文件与内存的映射
+	 * 将vm_area_struct 的内存操作 vma->vm_ops 设置为文件系统的操作 xxx_file_vm_ops
+	 * 从而将对虚拟内存的读写转换为对文件的读写
+	*/
+	int (*mmap) (struct file *, struct vm_area_struct *); 
+
 	unsigned long mmap_supported_flags;
 	int (*open) (struct inode *, struct file *);
 	int (*flush) (struct file *, fl_owner_t id);
@@ -2101,6 +2115,7 @@ static inline ssize_t call_write_iter(struct file *file, struct kiocb *kio,
 	return file->f_op->write_iter(kio, iter);
 }
 
+// 将虚拟内存操作映射为文件操作(和文件所属的文件系统相关)
 static inline int call_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	return file->f_op->mmap(file, vma);

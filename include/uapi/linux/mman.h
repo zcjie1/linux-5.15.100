@@ -9,6 +9,7 @@
 #define MREMAP_FIXED		2
 #define MREMAP_DONTUNMAP	4
 
+/* 过量虚拟内存申请处理策略 */
 #define OVERCOMMIT_GUESS		0
 #define OVERCOMMIT_ALWAYS		1
 #define OVERCOMMIT_NEVER		2

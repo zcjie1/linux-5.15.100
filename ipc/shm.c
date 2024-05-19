@@ -667,6 +667,8 @@ static const struct file_operations shm_file_operations_huge = {
 
 bool is_file_shm_hugepages(struct file *file)
 {
+	// SYSV 标准的系统调用 shmget 和 shmat 通过 shm 文件系统来共享内存
+	// 通过 shmat 的方式使用大页会设置
 	return file->f_op == &shm_file_operations_huge;
 }
 

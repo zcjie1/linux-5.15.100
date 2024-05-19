@@ -370,6 +370,10 @@ struct vm_area_struct {
 	 * Either between this VMA and vma->vm_prev, or between one of the
 	 * VMAs below us in the VMA rbtree and its ->vm_prev. This helps
 	 * get_unmapped_area find a free area of the right size.
+	 * 
+	 * 以当前节点为根节点，所有子树节点和本节点构成一个集合
+	 * 
+	 * 所有集合节点与vm_prev的gap间距的最大值
 	 */
 	unsigned long rb_subtree_gap;
 
@@ -381,15 +385,17 @@ struct vm_area_struct {
 	 * Access permissions of this VMA. 虚拟区域的访问权限和行为规范
 	 * See vmf_insert_mixed_prot() for discussion.
 	 */
-	// 页表属性，直接作用于物理页表中，针对页
+	// 页表属性，直接作用于物理页表中，针对页(读，写，执行等)
 	pgprot_t vm_page_prot; 
 
-	// 抽象属性，针对虚拟内存区域整体
+	// 抽象属性，针对虚拟内存区域整体(内存映射方式——匿名，文件，共享，私有等)
 	unsigned long vm_flags;		/* Flags, see mm.h. */
 
 	/*
 	 * For areas with an address space and backing store,
 	 * linkage into the address_space->i_mmap interval tree.
+	 * 
+	 * page cache反向映射
 	 */
 	struct {
 		struct rb_node rb;
@@ -408,7 +414,10 @@ struct vm_area_struct {
 					  * page_table_lock */
 	struct anon_vma *anon_vma;	/* Serialized by page_table_lock 匿名映射 */
 
-	/* Function pointers to deal with this struct. */
+	/** 
+	 * Function pointers to deal with this struct.
+	 * 文件映射虚拟内存相关的操作函数
+	 */
 	const struct vm_operations_struct *vm_ops;
 
 	/** Information about our backing store: 
@@ -445,15 +454,23 @@ struct core_state {
 struct kioctx_table;
 struct mm_struct {
 	struct {
-		struct vm_area_struct *mmap;		/* list of VMAs */
+
+		// 串联组织进程空间中所有的 VMA 的双向链表 
+		struct vm_area_struct *mmap;
+
+		// 管理进程空间中所有 VMA 的红黑树
 		struct rb_root mm_rb;
 		u64 vmacache_seqnum;                   /* per-thread vmacache */
 #ifdef CONFIG_MMU
+		// 寻找空闲VMA函数(受VMA映射区布局影响)
 		unsigned long (*get_unmapped_area) (struct file *filp,
 				unsigned long addr, unsigned long len,
 				unsigned long pgoff, unsigned long flags);
 #endif
+		// 文件映射与匿名映射区的起始地址
 		unsigned long mmap_base;	/* base of mmap area */
+
+		// 文件映射与匿名映射区在经典布局下的起始地址
 		unsigned long mmap_legacy_base;	/* base of mmap area in bottom-up allocations */
 #ifdef CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES
 		/* Base addresses for compatible mmap() */

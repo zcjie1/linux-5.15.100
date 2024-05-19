@@ -56,6 +56,8 @@
 extern int sysctl_overcommit_memory;
 extern int sysctl_overcommit_ratio;
 extern unsigned long sysctl_overcommit_kbytes;
+
+// 表示系统已分配的物理内存 + 未来可能需要分配的物理内存(可写的虚拟内存)
 extern struct percpu_counter vm_committed_as;
 
 #ifdef CONFIG_SMP

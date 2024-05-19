@@ -294,7 +294,7 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
 #define VM_LOCKONFAULT	0x00080000	/* Lock the pages covered when they are faulted in */
 #define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
-#define VM_NORESERVE	0x00200000	/* should the VM suppress accounting */
+#define VM_NORESERVE	0x00200000	/* should the VM suppress accounting 允许申请过量虚拟内存 */
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 #define VM_SYNC		0x00800000	/* Synchronous page faults */
 #define VM_ARCH_1	0x01000000	/* Architecture-specific flag */
@@ -2628,6 +2628,8 @@ extern int do_madvise(struct mm_struct *mm, unsigned long start, size_t len_in, 
 #ifdef CONFIG_MMU
 extern int __mm_populate(unsigned long addr, unsigned long len,
 			 int ignore_errors);
+
+// 为 [ret , ret + populate] 这段虚拟内存立即分配物理内存
 static inline void mm_populate(unsigned long addr, unsigned long len)
 {
 	/* Ignore errors */
@@ -2693,6 +2695,9 @@ extern struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned lon
 
 /**
  * find_vma_intersection() - Look up the first VMA which intersects the interval
+ * 
+ * 找到第一块重叠的VMA
+ * 
  * @mm: The process address space.
  * @start_addr: The inclusive start user address.
  * @end_addr: The exclusive end user address.

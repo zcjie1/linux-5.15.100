@@ -83,10 +83,12 @@ static int __init control_va_addr_alignment(char *str)
 }
 __setup("align_va_addr=", control_va_addr_alignment);
 
+// mmap系统调用
 SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
 		unsigned long, prot, unsigned long, flags,
 		unsigned long, fd, unsigned long, off)
 {
+	// 若off不与PAGESIZE对齐，返回错误
 	if (off & ~PAGE_MASK)
 		return -EINVAL;
 
@@ -119,6 +121,7 @@ static void find_start_end(unsigned long addr, unsigned long flags,
 		*end = task_size_64bit(addr > DEFAULT_MAP_WINDOW);
 }
 
+// 经典布局——VMA查找函数
 unsigned long
 arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		unsigned long len, unsigned long pgoff, unsigned long flags)
@@ -128,21 +131,46 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	struct vm_unmapped_area_info info;
 	unsigned long begin, end;
 
+	// 若指定了 MAP_FIXED 表示必须要从我们指定的 addr 开始映射 len 长度的区域
+	// 如果这块区域已经存在映射关系，那么后续内核会把旧的映射关系覆盖掉
 	if (flags & MAP_FIXED)
 		return addr;
 
+	// 确定可分配区域的start和end
 	find_start_end(addr, flags, &begin, &end);
 
+	// 映射区域长度是否超过进程虚拟内存空间
 	if (len > end)
 		return -ENOMEM;
 
+	// 若指定了addr
 	if (addr) {
+
+		// addr 先保证与 page size 对齐
 		addr = PAGE_ALIGN(addr);
+
+		/**
+		 * 此处需要确认一下我们指定的 [addr, addr+len] 这段虚拟内存区域是否存在已有的映射关系
+		 * 若[addr, addr+len] 地址范围内已经存在映射关系，则不能按照我们指定的 addr 作为映射起始地址
+		 * 
+		 * 在进程地址空间中查找第一个符合 addr < vma->vm_end  条件的 VMA
+		 * 若不存在这样一个 vma（!vma）, 则表示 [addr, addr+len] 这段范围的虚拟内存是可以使用的
+		 * 内核将会从我们指定的 addr 开始映射
+		 * 
+		 * 若存在这样一个 vma ，则表示  [addr, addr+len] 这段范围的虚拟内存区域目前已经存在映射关系
+		 * 
+		 * 还有一种情况是 addr 落在 prev 和 vma 之间的一块未映射区域
+		 * 如果这块未映射区域的长度满足 len 大小，那么这段未映射区域可以被本次使用
+		 * 内核也会从我们指定的 addr 开始映射
+		*/
 		vma = find_vma(mm, addr);
+
 		if (end - len >= addr &&
 		    (!vma || addr + len <= vm_start_gap(vma)))
 			return addr;
 	}
+
+	/* 未指明addr 或 addr无效 */
 
 	info.flags = 0;
 	info.length = len;

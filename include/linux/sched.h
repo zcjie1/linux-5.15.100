@@ -878,8 +878,11 @@ struct task_struct {
 	/* JOBCTL_*, siglock protected: */
 	unsigned long			jobctl;
 
-	/* Used for emulating ABI behavior of previous Linux versions: */
-	unsigned int			personality;
+	/** 
+	 * Used for emulating ABI behavior of previous Linux versions: 
+	 * 通过系统调用 personality 设置 task_struct->personality 标志位
+	*/
+	unsigned int			personality; 
 
 	/* Scheduler bits, serialized by scheduler locks: */
 	unsigned			sched_reset_on_fork:1;

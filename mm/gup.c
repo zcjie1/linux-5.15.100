@@ -1139,6 +1139,7 @@ static long __get_user_pages(struct mm_struct *mm,
 	if (!(gup_flags & FOLL_FORCE))
 		gup_flags |= FOLL_NUMA;
 
+	// 循环遍历 vma 中的每一个虚拟内存页
 	do {
 		struct page *page;
 		unsigned int foll_flags = gup_flags;
@@ -1192,9 +1193,12 @@ retry:
 		}
 		cond_resched();
 
+		// 在进程页表中检查该虚拟内存页背后是否有物理内存页映射
 		page = follow_page_mask(vma, start, foll_flags, &ctx);
 		if (!page) {
+			// 若不存在物理内存页映射，调用faultin_page函数
 			ret = faultin_page(vma, start, &foll_flags, locked);
+			
 			switch (ret) {
 			case 0:
 				goto retry;
@@ -1495,7 +1499,10 @@ long populate_vma_page_range(struct vm_area_struct *vma,
 		unsigned long start, unsigned long end, int *locked)
 {
 	struct mm_struct *mm = vma->vm_mm;
+
+	// 计算 vma 中包含的虚拟内存页个数，后续会按照 nr_pages 分配物理内存
 	unsigned long nr_pages = (end - start) / PAGE_SIZE;
+
 	int gup_flags;
 
 	VM_BUG_ON(!PAGE_ALIGNED(start));
@@ -1525,6 +1532,8 @@ long populate_vma_page_range(struct vm_area_struct *vma,
 	/*
 	 * We made sure addr is within a VMA, so the following will
 	 * not result in a stack expansion that recurses back here.
+	 * 
+	 * 循环遍历 vma 中的每一个虚拟内存页，依次为其分配物理内存页
 	 */
 	return __get_user_pages(mm, start, nr_pages, gup_flags,
 				NULL, NULL, locked);
@@ -1608,6 +1617,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 
 	end = start + len;
 
+	// 依次遍历进程地址空间中 [start , end] 这段虚拟内存范围的所有 vma
 	for (nstart = start; nstart < end; nstart = nend) {
 		/*
 		 * We want to fault in pages for [nstart; end) address range.
@@ -1634,6 +1644,8 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		 * Now fault in a range of pages. populate_vma_page_range()
 		 * double checks the vma flags, so that it won't mlock pages
 		 * if the vma was already munlocked.
+		 * 
+		 * 为这段地址范围内的所有 vma 分配物理内存
 		 */
 		ret = populate_vma_page_range(vma, nstart, nend, &locked);
 		if (ret < 0) {
@@ -1643,6 +1655,8 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 			}
 			break;
 		}
+
+		// 继续为下一个 vma （如果有的话）分配物理内存
 		nend = nstart + ret * PAGE_SIZE;
 		ret = 0;
 	}

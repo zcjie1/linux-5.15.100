@@ -480,9 +480,12 @@ struct file *hugetlb_file_setup(const char *name, size_t size, vm_flags_t acct,
 
 static inline bool is_file_hugepages(struct file *file)
 {
+	// hugetlbfs 文件系统中的文件默认由大页支持
+	// mmap 通过映射 hugetlbfs 中的文件实现文件大页映射
 	if (file->f_op == &hugetlbfs_file_operations)
 		return true;
 
+	// 通过 shmat 使用匿名大页
 	return is_file_shm_hugepages(file);
 }
 

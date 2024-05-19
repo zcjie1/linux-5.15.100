@@ -4186,13 +4186,20 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	 * accessible to the user through its mapping, use S_PRIVATE flag to
 	 * bypass file security, in the same way as shmem_kernel_file_setup().
 	 */
+
+	// 从 tmpfs 中获取一个匿名文件
 	file = shmem_kernel_file_setup("dev/zero", size, vma->vm_flags);
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 
+	// 如果 vma 中已存在其他文件，则解除与其他文件的映射关系
 	if (vma->vm_file)
 		fput(vma->vm_file);
+	
+	// 将 tmpfs 中的匿名文件映射进虚拟内存区域 vma 中
 	vma->vm_file = file;
+
+	// 将对共享匿名映射区相关操作映射成 shmem_vm_ops
 	vma->vm_ops = &shmem_vm_ops;
 
 	if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE) &&
