@@ -7,8 +7,13 @@
 #define MINORBITS	20
 #define MINORMASK	((1U << MINORBITS) - 1)
 
+// 获取主设备号
 #define MAJOR(dev)	((unsigned int) ((dev) >> MINORBITS))
+
+// 获取从设备号
 #define MINOR(dev)	((unsigned int) ((dev) & MINORMASK))
+
+// 根据主从设备号计算dev_t设备号
 #define MKDEV(ma,mi)	(((ma) << MINORBITS) | (mi))
 
 #define print_dev_t(buffer, dev)					\

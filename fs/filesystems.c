@@ -18,8 +18,14 @@
 #include <linux/uaccess.h>
 #include <linux/fs_parser.h>
 
-/*
+/**
  * Handling of filesystem drivers list.
+ * 
+ * 支持的文件系统列表
+ * 
+ * 驱动程序可以使用register_filesystem和unregister_filesystem
+ * 注册或注销自己的文件系统
+ * 
  * Rules:
  *	Inclusion to/removals from/scanning of list are protected by spinlock.
  *	During the unload module must call unregister_filesystem().
@@ -30,7 +36,6 @@
  *	returned 0 we must skip the element, otherwise we got the reference.
  *	Once the reference is obtained we can drop the spinlock.
  */
-
 static struct file_system_type *file_systems;
 static DEFINE_RWLOCK(file_systems_lock);
 
@@ -58,6 +63,9 @@ static struct file_system_type **find_filesystem(const char *name, unsigned len)
 
 /**
  *	register_filesystem - register a new filesystem
+ *  
+ *  注册新的文件系统(将相应描述符到file_systems链表上)
+ *  
  *	@fs: the file system structure
  *
  *	Adds the file system passed to the list of file systems the kernel
@@ -74,19 +82,27 @@ int register_filesystem(struct file_system_type * fs)
 	int res = 0;
 	struct file_system_type ** p;
 
+	// 检查文件系统参数是否有效
 	if (fs->parameters &&
 	    !fs_validate_description(fs->name, fs->parameters))
 		return -EINVAL;
-
+	
+	// 若文件系统名字中带 "." , 则警告
 	BUG_ON(strchr(fs->name, '.'));
+
+	// 若next指针不为空，返回错误
 	if (fs->next)
 		return -EBUSY;
+	
 	write_lock(&file_systems_lock);
+
+	// 查找文件系统是否已经注册
+	// 若未注册，返回指向next指针的指针
 	p = find_filesystem(fs->name, strlen(fs->name));
 	if (*p)
-		res = -EBUSY;
+		res = -EBUSY; // 若已经注册，返回错误
 	else
-		*p = fs;
+		*p = fs; // 填充next指针
 	write_unlock(&file_systems_lock);
 	return res;
 }
@@ -95,6 +111,9 @@ EXPORT_SYMBOL(register_filesystem);
 
 /**
  *	unregister_filesystem - unregister a file system
+ *  
+ *  注销文件系统(从file_systems链表上清除)
+ *  
  *	@fs: filesystem to unregister
  *
  *	Remove a file system that was previously successfully registered
@@ -258,6 +277,7 @@ static int __init proc_filesystems_init(void)
 module_init(proc_filesystems_init);
 #endif
 
+// 根据name查找注册的文件系统
 static struct file_system_type *__get_fs_type(const char *name, int len)
 {
 	struct file_system_type *fs;
@@ -285,7 +305,7 @@ struct file_system_type *get_fs_type(const char *name)
 	}
 
 	if (dot && fs && !(fs->fs_flags & FS_HAS_SUBTYPE)) {
-		put_filesystem(fs);
+		put_filesystem(fs); // 减少模块的引用计数
 		fs = NULL;
 	}
 	return fs;

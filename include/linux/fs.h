@@ -2464,9 +2464,12 @@ extern int file_modified(struct file *file);
 
 int sync_inode_metadata(struct inode *inode, int wait);
 
+// 文件系统类型
 struct file_system_type {
-	const char *name;
-	int fs_flags;
+
+	const char *name; // 文件系统名字
+	int fs_flags; // 文件系统标志位
+
 #define FS_REQUIRES_DEV		1 
 #define FS_BINARY_MOUNTDATA	2
 #define FS_HAS_SUBTYPE		4
@@ -2475,15 +2478,27 @@ struct file_system_type {
 #define FS_ALLOW_IDMAP         32      /* FS has been updated to handle vfs idmappings. */
 #define FS_THP_SUPPORT		8192	/* Remove once all fs converted */
 #define FS_RENAME_DOES_D_MOVE	32768	/* FS will handle d_move() during rename() internally. */
-	int (*init_fs_context)(struct fs_context *);
-	const struct fs_parameter_spec *parameters;
+
+	int (*init_fs_context)(struct fs_context *); // 初始化fs_context(和超级块创建相关)
+
+	const struct fs_parameter_spec *parameters; // 描述所需参数类型
+
+	// 文件系统挂载函数
 	struct dentry *(*mount) (struct file_system_type *, int,
 		       const char *, void *);
+
+	// 清除超级块
 	void (*kill_sb) (struct super_block *);
+
+	// 所属模块
 	struct module *owner;
-	struct file_system_type * next;
+
+	struct file_system_type * next; // file_systems中的连接点
+
+	// 哈希桶链表头，管理此文件系统类型的实例(超级块)
 	struct hlist_head fs_supers;
 
+	/* 死锁处理相关 */
 	struct lock_class_key s_lock_key;
 	struct lock_class_key s_umount_key;
 	struct lock_class_key s_vfs_rename_key;

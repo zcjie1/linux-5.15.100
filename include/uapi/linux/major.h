@@ -5,6 +5,8 @@
 /*
  * This file has definitions for major device numbers.
  * For the device number assignments, see Documentation/admin-guide/devices.rst.
+ * 
+ * 设备驱动程序主设备号
  */
 
 #define UNNAMED_MAJOR		0
