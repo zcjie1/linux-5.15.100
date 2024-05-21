@@ -233,7 +233,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 	struct inode *inode;
 
 	if (ops->alloc_inode)
-		inode = ops->alloc_inode(sb);
+		inode = ops->alloc_inode(sb); // bdev_alloc_inode
 	else
 		inode = kmem_cache_alloc(inode_cachep, GFP_KERNEL);
 
@@ -2122,6 +2122,7 @@ void __init inode_init(void)
 					0);
 }
 
+// 为各类设备文件初始化inode
 void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 {
 	inode->i_mode = mode;

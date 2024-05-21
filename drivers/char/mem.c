@@ -640,6 +640,7 @@ static int open_port(struct inode *inode, struct file *filp)
 #define write_iter_zero	write_iter_null
 #define open_mem	open_port
 
+/* /dev/mem 设备文件操作函数 */
 static const struct file_operations __maybe_unused mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -652,6 +653,7 @@ static const struct file_operations __maybe_unused mem_fops = {
 #endif
 };
 
+/* /dev/null 设备文件操作函数 */
 static const struct file_operations null_fops = {
 	.llseek		= null_lseek,
 	.read		= read_null,
@@ -668,6 +670,7 @@ static const struct file_operations __maybe_unused port_fops = {
 	.open		= open_port,
 };
 
+/* /dev/zero 设备文件操作函数 */
 static const struct file_operations zero_fops = {
 	.llseek		= zero_lseek,
 	.write		= write_zero,
@@ -731,6 +734,7 @@ static int memory_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+// 内存文件操作函数
 static const struct file_operations memory_fops = {
 	.open = memory_open,
 	.llseek = noop_llseek,

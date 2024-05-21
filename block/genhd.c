@@ -29,6 +29,12 @@
 #include "blk.h"
 #include "blk-rq-qos.h"
 
+/**
+ * bdev_map移除 —— https://www.spinics.net/linux/fedora/redhat-crash-utility/msg09779.html
+ * 
+ * 通过 blockdev_superblock.s_inodes 查找 gendisk
+*/
+
 static struct kobject *block_depr;
 
 /*
@@ -175,7 +181,7 @@ static void part_in_flight_rw(struct block_device *part,
 
 /*
  * Can be deleted altogether. Later.
- *
+ * 块设备主设备号注册
  */
 #define BLKDEV_MAJOR_HASH_SIZE 255
 static struct blk_major_name {
@@ -383,6 +389,9 @@ static void disk_scan_partitions(struct gendisk *disk)
 
 /**
  * device_add_disk - add disk information to kernel list
+ * 
+ * 注册块设备
+ * 
  * @parent: parent device for the disk
  * @disk: per-device partitioning information
  * @groups: Additional per-device sysfs groups
@@ -847,7 +856,10 @@ static int __init genhd_device_init(void)
 
 	register_blkdev(BLOCK_EXT_MAJOR, "blkext");
 
-	/* create top-level block dir */
+	/** 
+	 * create top-level block dir
+	 * 创建顶层block目录
+	 */
 	if (!sysfs_deprecated)
 		block_depr = kobject_create_and_add("block", NULL);
 	return 0;

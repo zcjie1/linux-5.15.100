@@ -25,17 +25,19 @@
 
 #include "internal.h"
 
+// 字符设备全局管理结构(哈希表-主设备号散列)
 static struct kobj_map *cdev_map;
 
 static DEFINE_MUTEX(chrdevs_lock);
 
 #define CHRDEV_MAJOR_HASH_SIZE 255
 
+// 字符设备-设备号管理结构(哈希表)
 static struct char_device_struct {
 	struct char_device_struct *next;
-	unsigned int major;
-	unsigned int baseminor;
-	int minorct;
+	unsigned int major; // 主设备号
+	unsigned int baseminor; // 从设备号最小值
+	int minorct; // 从设备号数量
 	char name[64];
 	struct cdev *cdev;		/* will die */
 } *chrdevs[CHRDEV_MAJOR_HASH_SIZE];
@@ -62,22 +64,31 @@ void chrdev_show(struct seq_file *f, off_t offset)
 
 #endif /* CONFIG_PROC_FS */
 
+// 动态分配主设备号
 static int find_dynamic_major(void)
 {
 	int i;
 	struct char_device_struct *cd;
 
+	// 从大于CHRDEV_MAJOR_DYN_END的index分配
 	for (i = ARRAY_SIZE(chrdevs)-1; i >= CHRDEV_MAJOR_DYN_END; i--) {
 		if (chrdevs[i] == NULL)
 			return i;
 	}
 
+	/* 此时从 [CHRDEV_MAJOR_DYN_END, ARRAY_SIZE(chrdevs)]未找到空闲主设备号 */
+
+	// 遍历范围内的index对应的所有链表
 	for (i = CHRDEV_MAJOR_DYN_EXT_START;
 	     i >= CHRDEV_MAJOR_DYN_EXT_END; i--) {
+		
+		// 选定一个index后，遍历对应的链表
 		for (cd = chrdevs[major_to_index(i)]; cd; cd = cd->next)
+			// 若主设备号已经被注册，遍历下一个index
 			if (cd->major == i)
 				break;
 
+		// 若cd为NULL，返回主设备号
 		if (cd == NULL)
 			return i;
 	}
@@ -101,24 +112,28 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 	int ret;
 	int i;
 
+	// 若主设备号过大
 	if (major >= CHRDEV_MAJOR_MAX) {
 		pr_err("CHRDEV \"%s\" major requested (%u) is greater than the maximum (%u)\n",
 		       name, major, CHRDEV_MAJOR_MAX-1);
 		return ERR_PTR(-EINVAL);
 	}
 
+	// 若申请的设备号数量过多
 	if (minorct > MINORMASK + 1 - baseminor) {
 		pr_err("CHRDEV \"%s\" minor range requested (%u-%u) is out of range of maximum range (%u-%u) for a single major\n",
 			name, baseminor, baseminor + minorct - 1, 0, MINORMASK);
 		return ERR_PTR(-EINVAL);
 	}
 
+	// 分配char_device_struct
 	cd = kzalloc(sizeof(struct char_device_struct), GFP_KERNEL);
 	if (cd == NULL)
 		return ERR_PTR(-ENOMEM);
 
 	mutex_lock(&chrdevs_lock);
 
+	// 若主设备号为0，动态分配一个未使用的
 	if (major == 0) {
 		ret = find_dynamic_major();
 		if (ret < 0) {
@@ -130,29 +145,35 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 	}
 
 	ret = -EBUSY;
+
+	// 获取主设备号对应的哈希值(其实就是对255取余)
 	i = major_to_index(major);
+
+	// 遍历字符设备号哈希表的某一条链表
 	for (curr = chrdevs[i]; curr; prev = curr, curr = curr->next) {
+		/* 寻找主设备号的嵌入位置 */
 		if (curr->major < major)
 			continue;
-
 		if (curr->major > major)
 			break;
 
+		/* 此时，找到了主设备号相同的节点，寻找次设备号的嵌入位置 */
 		if (curr->baseminor + curr->minorct <= baseminor)
 			continue;
-
 		if (curr->baseminor >= baseminor + minorct)
 			break;
 
+		/* 此时，找到了主设备号相同，次设备号重叠的区间 */
 		goto out;
 	}
 
+	// 插入节点初始化
 	cd->major = major;
 	cd->baseminor = baseminor;
 	cd->minorct = minorct;
 	strlcpy(cd->name, name, sizeof(cd->name));
 
-	if (!prev) {
+	if (!prev) { // 若哈希表对应主设备号的链表为空
 		cd->next = curr;
 		chrdevs[i] = cd;
 	} else {
@@ -162,6 +183,8 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 
 	mutex_unlock(&chrdevs_lock);
 	return cd;
+
+// 主设备号相同的情况下，次设备号重叠，返回错误
 out:
 	mutex_unlock(&chrdevs_lock);
 	kfree(cd);
@@ -190,6 +213,9 @@ __unregister_chrdev_region(unsigned major, unsigned baseminor, int minorct)
 
 /**
  * register_chrdev_region() - register a range of device numbers
+ * 
+ * 从指定范围注册字符设备号
+ * 
  * @from: the first in the desired range of device numbers; must include
  *        the major number.
  * @count: the number of consecutive device numbers required
@@ -204,7 +230,7 @@ int register_chrdev_region(dev_t from, unsigned count, const char *name)
 	dev_t n, next;
 
 	for (n = from; n < to; n = next) {
-		next = MKDEV(MAJOR(n)+1, 0);
+		next = MKDEV(MAJOR(n)+1, 0); // 增大一个主设备号对应的从设备号数量最大值
 		if (next > to)
 			next = to;
 		cd = __register_chrdev_region(MAJOR(n), MINOR(n),
@@ -214,6 +240,7 @@ int register_chrdev_region(dev_t from, unsigned count, const char *name)
 	}
 	return 0;
 fail:
+	// 将已经注册的设备号注销
 	to = n;
 	for (n = from; n < to; n = next) {
 		next = MKDEV(MAJOR(n)+1, 0);
@@ -224,6 +251,9 @@ fail:
 
 /**
  * alloc_chrdev_region() - register a range of char device numbers
+ * 
+ * 由内核选择范围，注册字符设备号，分配的首个设备号由dev返回
+ * 
  * @dev: output parameter for first assigned number
  * @baseminor: first of the requested range of minor numbers
  * @count: the number of minor numbers required
@@ -246,6 +276,9 @@ int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count,
 
 /**
  * __register_chrdev() - create and register a cdev occupying a range of minors
+ * 
+ * register_chrdev_region + cdev_add二合一
+ * 
  * @major: major device number or 0 for dynamic allocation
  * @baseminor: first of the requested range of minor numbers
  * @count: the number of minor numbers required
@@ -345,14 +378,19 @@ void __unregister_chrdev(unsigned int major, unsigned int baseminor,
 
 static DEFINE_SPINLOCK(cdev_lock);
 
+// 尝试增加module和cdev->kobject的引用计数
 static struct kobject *cdev_get(struct cdev *p)
 {
 	struct module *owner = p->owner;
 	struct kobject *kobj;
 
+	// 尝试增加模块引用计数
 	if (owner && !try_module_get(owner))
 		return NULL;
+	
+	// 增加cdev对应kobject的引用计数
 	kobj = kobject_get_unless_zero(&p->kobj);
+
 	if (!kobj)
 		module_put(owner);
 	return kobj;
@@ -369,6 +407,7 @@ void cdev_put(struct cdev *p)
 
 /*
  * Called every time a character special file is opened
+ * 打开字符设备
  */
 static int chrdev_open(struct inode *inode, struct file *filp)
 {
@@ -379,13 +418,18 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 
 	spin_lock(&cdev_lock);
 	p = inode->i_cdev;
-	if (!p) {
+
+	if (!p) { // 若此inode从未打开过
 		struct kobject *kobj;
 		int idx;
 		spin_unlock(&cdev_lock);
+
+		// 查询设备号对应的kobject
 		kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx);
 		if (!kobj)
 			return -ENXIO;
+		
+		// 根据kobject得到对应的struct cdev
 		new = container_of(kobj, struct cdev, kobj);
 		spin_lock(&cdev_lock);
 		/* Check i_cdev again in case somebody beat us to it while
@@ -393,6 +437,7 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 		p = inode->i_cdev;
 		if (!p) {
 			inode->i_cdev = p = new;
+			// 将设备文件inod连接到struct cdev->list上
 			list_add(&inode->i_devices, &p->list);
 			new = NULL;
 		} else if (!cdev_get(p))
@@ -400,17 +445,22 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 	} else if (!cdev_get(p))
 		ret = -ENXIO;
 	spin_unlock(&cdev_lock);
+
+	//若new不为NULL，减少kobject和module引用计数
 	cdev_put(new);
 	if (ret)
 		return ret;
 
 	ret = -ENXIO;
+
+	// 获取设备的 file_operations
 	fops = fops_get(p->ops);
 	if (!fops)
 		goto out_cdev_put;
 
 	replace_fops(filp, fops);
 	if (filp->f_op->open) {
+		// 调用字符设备open函数
 		ret = filp->f_op->open(inode, filp);
 		if (ret)
 			goto out_cdev_put;
@@ -448,18 +498,22 @@ static void cdev_purge(struct cdev *cdev)
  * Dummy default file-operations: the only thing this does
  * is contain the open that then fills in the correct operations
  * depending on the special file...
+ * 
+ * 字符设备基础操作函数
  */
 const struct file_operations def_chr_fops = {
 	.open = chrdev_open,
 	.llseek = noop_llseek,
 };
 
+// 返回cdev对应的kobject
 static struct kobject *exact_match(dev_t dev, int *part, void *data)
 {
 	struct cdev *p = data;
 	return &p->kobj;
 }
 
+// 增加cdev->kobject和对应module的引用计数，成功返回0，失败返回-1
 static int exact_lock(dev_t dev, void *data)
 {
 	struct cdev *p = data;
@@ -468,6 +522,9 @@ static int exact_lock(dev_t dev, void *data)
 
 /**
  * cdev_add() - add a char device to the system
+ * 
+ * 添加cdev字符设备至cdev_map哈希表中
+ * 
  * @p: the cdev structure for the device
  * @dev: the first device number for which this device is responsible
  * @count: the number of consecutive minor numbers corresponding to this
@@ -483,6 +540,7 @@ int cdev_add(struct cdev *p, dev_t dev, unsigned count)
 	p->dev = dev;
 	p->count = count;
 
+	// 若设备号为0，返回错误
 	if (WARN_ON(dev == WHITEOUT_DEV))
 		return -EBUSY;
 
@@ -491,6 +549,7 @@ int cdev_add(struct cdev *p, dev_t dev, unsigned count)
 	if (error)
 		return error;
 
+	// 增加引用计数
 	kobject_get(p->kobj.parent);
 
 	return 0;
@@ -641,7 +700,8 @@ struct cdev *cdev_alloc(void)
 }
 
 /**
- * cdev_init() - initialize a cdev structure
+ * cdev_init() - initialize a cdev structure——初始化struct cdev结构体
+ * 
  * @cdev: the structure to initialize
  * @fops: the file_operations for this device
  *

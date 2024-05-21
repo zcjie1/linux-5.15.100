@@ -31,16 +31,19 @@ static __always_inline bool old_valid_dev(dev_t dev)
 	return MAJOR(dev) < 256 && MINOR(dev) < 256;
 }
 
+// 将dev_t设备号转为16位旧式布局
 static __always_inline u16 old_encode_dev(dev_t dev)
 {
 	return (MAJOR(dev) << 8) | MINOR(dev);
 }
 
+// 将16位旧式设备号转为dev_t新式布局
 static __always_inline dev_t old_decode_dev(u16 val)
 {
 	return MKDEV((val >> 8) & 255, val & 255);
 }
 
+// 将dev_t转为外部表示(用户空间，为了兼容16位旧式设备号)
 static __always_inline u32 new_encode_dev(dev_t dev)
 {
 	unsigned major = MAJOR(dev);
@@ -48,6 +51,7 @@ static __always_inline u32 new_encode_dev(dev_t dev)
 	return (minor & 0xff) | (major << 8) | ((minor & ~0xff) << 12);
 }
 
+// 将用户空间设备号转为dev_t格式
 static __always_inline dev_t new_decode_dev(u32 dev)
 {
 	unsigned major = (dev & 0xfff00) >> 8;

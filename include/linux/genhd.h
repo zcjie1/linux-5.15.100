@@ -114,6 +114,7 @@ struct blk_integrity {
 	unsigned char				tag_size;
 };
 
+// 块设备
 struct gendisk {
 	/* major, first_minor and minors are input parameters only,
 	 * don't use directly.  Use disk_devt() and disk_max_parts().
@@ -129,10 +130,11 @@ struct gendisk {
 	unsigned short event_flags;	/* flags related to event processing */
 
 	struct xarray part_tbl;
+
 	struct block_device *part0;
 
 	const struct block_device_operations *fops;
-	struct request_queue *queue;
+	struct request_queue *queue; // IO请求队列
 	void *private_data;
 
 	int flags;

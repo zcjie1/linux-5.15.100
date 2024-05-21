@@ -1214,6 +1214,7 @@ err:
 	return ret;
 }
 
+// 管道设备文件基础操作函数
 const struct file_operations pipefifo_fops = {
 	.open		= fifo_open,
 	.llseek		= no_llseek,

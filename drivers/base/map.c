@@ -19,32 +19,51 @@
 struct kobj_map {
 	struct probe {
 		struct probe *next;
+
+		// 设备号
 		dev_t dev;
+
+		// 从设备号范围——[MINORS(dev), MINORS(dev)+range-1]
 		unsigned long range;
+
+		// 提供设备驱动的模块
 		struct module *owner;
+
+		// 函数指针，返回与设备相关联的kobject实例
 		kobj_probe_t *get;
+
 		int (*lock)(dev_t, void *);
+
+		// 指向关联的struct cdev
 		void *data;
 	} *probes[255];
 	struct mutex *lock;
 };
 
+// 将字符设备纳入cdev_map的管理
 int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 	     struct module *module, kobj_probe_t *probe,
 	     int (*lock)(dev_t, void *), void *data)
 {
+	// 计算range范围覆盖了几个主设备号
+	// range为这种设备提供的从设备号数量
 	unsigned int n = MAJOR(dev + range - 1) - MAJOR(dev) + 1;
+
+	// 获取主设备号
 	unsigned int index = MAJOR(dev);
+
 	unsigned int i;
 	struct probe *p;
 
 	if (n > 255)
 		n = 255;
 
+	// 覆盖n个主设备号对应n个probe结构
 	p = kmalloc_array(n, sizeof(struct probe), GFP_KERNEL);
 	if (p == NULL)
 		return -ENOMEM;
 
+	// 初始化
 	for (i = 0; i < n; i++, p++) {
 		p->owner = module;
 		p->get = probe;
@@ -56,8 +75,10 @@ int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 	mutex_lock(domain->lock);
 	for (i = 0, p -= n; i < n; i++, p++, index++) {
 		struct probe **s = &domain->probes[index % 255];
+		// cdev_map链表中probe按range的大小排序
 		while (*s && (*s)->range < range)
 			s = &(*s)->next;
+		// 插入字符设备
 		p->next = *s;
 		*s = p;
 	}

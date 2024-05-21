@@ -448,6 +448,7 @@ static int bd_init_fs_context(struct fs_context *fc)
 	return 0;
 }
 
+// blockdev_superblock对应的文件系统
 static struct file_system_type bd_type = {
 	.name		= "bdev",
 	.init_fs_context = bd_init_fs_context,
@@ -457,6 +458,7 @@ static struct file_system_type bd_type = {
 struct super_block *blockdev_superblock __read_mostly;
 EXPORT_SYMBOL_GPL(blockdev_superblock);
 
+// blockdev_superblock初始化
 void __init bdev_cache_init(void)
 {
 	int err;
@@ -475,6 +477,7 @@ void __init bdev_cache_init(void)
 	blockdev_superblock = bd_mnt->mnt_sb;   /* For writeback */
 }
 
+// 将gendisk链接到blockdev_superblock.s_inodes上
 struct block_device *bdev_alloc(struct gendisk *disk, u8 partno)
 {
 	struct block_device *bdev;

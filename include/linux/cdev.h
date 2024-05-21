@@ -11,13 +11,14 @@ struct file_operations;
 struct inode;
 struct module;
 
+// 字符设备
 struct cdev {
-	struct kobject kobj;
-	struct module *owner;
-	const struct file_operations *ops;
-	struct list_head list;
-	dev_t dev;
-	unsigned int count;
+	struct kobject kobj; // kobject管理结构
+	struct module *owner; // 字符设备所属的模块
+	const struct file_operations *ops; // 文件操作函数
+	struct list_head list; // 连接字符设备对应的所有设备文件inode
+	dev_t dev; // 起始设备号
+	unsigned int count; // 连续的字符设备号数量(从设备号数量)
 } __randomize_layout;
 
 void cdev_init(struct cdev *, const struct file_operations *);

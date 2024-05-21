@@ -627,9 +627,11 @@ struct fsnotify_mark_connector;
  * Keep mostly read-only and often accessed (especially for
  * the RCU path lookup and 'stat' data) fields at the beginning
  * of the 'struct inode'
+ * 
+ * 文件节点
  */
 struct inode {
-	umode_t			i_mode;
+	umode_t			i_mode; // 文件类型
 	unsigned short		i_opflags;
 	kuid_t			i_uid;
 	kgid_t			i_gid;
@@ -661,7 +663,7 @@ struct inode {
 		const unsigned int i_nlink;
 		unsigned int __i_nlink;
 	};
-	dev_t			i_rdev;
+	dev_t			i_rdev; // 设备文件主从设备号
 	loff_t			i_size;
 	struct timespec64	i_atime;
 	struct timespec64	i_mtime;
@@ -709,7 +711,7 @@ struct inode {
 	atomic_t		i_readcount; /* struct files open RO */
 #endif
 	union {
-		const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
+		const struct file_operations	*i_fop;	/* 文件操作函数集合 former ->i_op->default_file_ops */
 		void (*free_inode)(struct inode *);
 	};
 	struct file_lock_context	*i_flctx;
@@ -717,7 +719,9 @@ struct inode {
 	struct list_head	i_devices;
 	union {
 		struct pipe_inode_info	*i_pipe;
-		struct cdev		*i_cdev;
+
+		struct cdev		*i_cdev; // 指向所对应的字符设备
+
 		char			*i_link;
 		unsigned		i_dir_seq;
 	};
