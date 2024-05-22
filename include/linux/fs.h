@@ -664,7 +664,7 @@ struct inode {
 		unsigned int __i_nlink;
 	};
 	dev_t			i_rdev; // 设备文件主从设备号
-	loff_t			i_size;
+	loff_t			i_size; // 文件所占大小
 	struct timespec64	i_atime;
 	struct timespec64	i_mtime;
 	struct timespec64	i_ctime;

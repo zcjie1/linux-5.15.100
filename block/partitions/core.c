@@ -311,6 +311,8 @@ static DEVICE_ATTR(whole_disk, 0444, whole_disk_show, NULL);
 /*
  * Must be called either with open_mutex held, before a disk can be opened or
  * after all disk users are gone.
+ * 
+ * 为gendisk添加磁盘分区
  */
 static struct block_device *add_partition(struct gendisk *disk, int partno,
 				sector_t start, sector_t len, int flags,
@@ -325,6 +327,7 @@ static struct block_device *add_partition(struct gendisk *disk, int partno,
 
 	lockdep_assert_held(&disk->open_mutex);
 
+	// 分区号不可超过最大值
 	if (partno >= disk_max_parts(disk))
 		return ERR_PTR(-EINVAL);
 
@@ -376,6 +379,7 @@ static struct block_device *add_partition(struct gendisk *disk, int partno,
 	if (bdev->bd_partno < disk->minors) {
 		devt = MKDEV(disk->major, disk->first_minor + bdev->bd_partno);
 	} else {
+		// 分配从设备号
 		err = blk_alloc_ext_minor();
 		if (err < 0)
 			goto out_put;

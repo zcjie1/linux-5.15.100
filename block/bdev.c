@@ -30,8 +30,10 @@
 #include "blk.h"
 
 struct bdev_inode {
-	struct block_device bdev;
-	struct inode vfs_inode;
+	struct block_device bdev; // 块设备实例
+
+	// bdev伪文件系统中块设备文件对应的inode(用来标识块设备自身)
+	struct inode vfs_inode; 
 };
 
 static inline struct bdev_inode *BDEV_I(struct inode *inode)
@@ -448,7 +450,7 @@ static int bd_init_fs_context(struct fs_context *fc)
 	return 0;
 }
 
-// blockdev_superblock对应的文件系统
+// blockdev_superblock对应的文件系统-bdev
 static struct file_system_type bd_type = {
 	.name		= "bdev",
 	.init_fs_context = bd_init_fs_context,
@@ -477,7 +479,10 @@ void __init bdev_cache_init(void)
 	blockdev_superblock = bd_mnt->mnt_sb;   /* For writeback */
 }
 
-// 将gendisk链接到blockdev_superblock.s_inodes上
+/** 
+ * 分配block_device以及对应的bdev_inode结构体
+ * 将gendisk链接到blockdev_superblock.s_inodes上
+ */
 struct block_device *bdev_alloc(struct gendisk *disk, u8 partno)
 {
 	struct block_device *bdev;

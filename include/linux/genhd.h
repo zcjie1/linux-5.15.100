@@ -114,28 +114,27 @@ struct blk_integrity {
 	unsigned char				tag_size;
 };
 
-// 块设备
+// 块设备通用类型(用于管理磁盘分区)
 struct gendisk {
 	/* major, first_minor and minors are input parameters only,
 	 * don't use directly.  Use disk_devt() and disk_max_parts().
 	 */
-	int major;			/* major number of driver */
-	int first_minor;
-	int minors;                     /* maximum number of minors, =1 for
-                                         * disks that can't be partitioned. */
+	int major;			/* 驱动程序的主设备号*/
+	int first_minor; /* 最小的从设备号 */
+	int minors;     /* 从设备号(分区号)的最大值, =1表明磁盘无分区 */
 
-	char disk_name[DISK_NAME_LEN];	/* name of major driver */
+	char disk_name[DISK_NAME_LEN];	/* 磁盘的名字-展示在 "/proc/partitions" 中 */
 
 	unsigned short events;		/* supported events */
 	unsigned short event_flags;	/* flags related to event processing */
 
-	struct xarray part_tbl;
+	struct xarray part_tbl; // 管理磁盘分区(block_device)
 
-	struct block_device *part0;
+	struct block_device *part0; // 第一个磁盘分区
 
-	const struct block_device_operations *fops;
-	struct request_queue *queue; // IO请求队列
-	void *private_data;
+	const struct block_device_operations *fops; // 磁盘分区操作函数
+	struct request_queue *queue; // IO请求管理队列
+	void *private_data; // 指向私有的驱动程序数据
 
 	int flags;
 	unsigned long state;
@@ -209,6 +208,8 @@ void disk_uevent(struct gendisk *disk, enum kobject_action action);
 /* block/genhd.c */
 int device_add_disk(struct device *parent, struct gendisk *disk,
 		const struct attribute_group **groups);
+
+// 分配gendisk
 static inline int add_disk(struct gendisk *disk)
 {
 	return device_add_disk(NULL, disk, NULL);

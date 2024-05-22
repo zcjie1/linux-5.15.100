@@ -298,6 +298,7 @@ err_fc:
 	return ERR_PTR(ret);
 }
 
+// 初始化fs_context, 调用fs_type中的init_fs_context
 struct fs_context *fs_context_for_mount(struct file_system_type *fs_type,
 					unsigned int sb_flags)
 {

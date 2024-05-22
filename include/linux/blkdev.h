@@ -376,6 +376,7 @@ static inline int blkdev_zone_mgmt_ioctl(struct block_device *bdev,
 
 #endif /* CONFIG_BLK_DEV_ZONED */
 
+// IO请求队列
 struct request_queue {
 	struct request		*last_merge;
 	struct elevator_queue	*elevator;
@@ -444,7 +445,7 @@ struct request_queue {
 	/*
 	 * queue settings
 	 */
-	unsigned long		nr_requests;	/* Max # of requests */
+	unsigned long		nr_requests;	/* 最大的请求数量 Max # of requests */
 
 	unsigned int		dma_pad_mask;
 	unsigned int		dma_alignment;
@@ -1845,7 +1846,7 @@ static inline void blk_ksm_unregister(struct request_queue *q) { }
 
 #endif /* CONFIG_BLK_INLINE_ENCRYPTION */
 
-
+// 块设备实例操作函数
 struct block_device_operations {
 	blk_qc_t (*submit_bio) (struct bio *bio);
 	int (*open) (struct block_device *, fmode_t);
@@ -1863,7 +1864,7 @@ struct block_device_operations {
 	int (*report_zones)(struct gendisk *, sector_t sector,
 			unsigned int nr_zones, report_zones_cb cb, void *data);
 	char *(*devnode)(struct gendisk *disk, umode_t *mode);
-	struct module *owner;
+	struct module *owner; // 指向驱动程序模块
 	const struct pr_ops *pr_ops;
 
 	/*

@@ -326,6 +326,7 @@ void unregister_blkdev(unsigned int major, const char *name)
 
 EXPORT_SYMBOL(unregister_blkdev);
 
+// 分配从设备号
 int blk_alloc_ext_minor(void)
 {
 	int idx;
@@ -390,7 +391,7 @@ static void disk_scan_partitions(struct gendisk *disk)
 /**
  * device_add_disk - add disk information to kernel list
  * 
- * 注册块设备
+ * 注册块设备，分配gendisk
  * 
  * @parent: parent device for the disk
  * @disk: per-device partitioning information
@@ -1342,6 +1343,7 @@ out_put_queue:
 }
 EXPORT_SYMBOL(__alloc_disk_node);
 
+// 分配gendisk
 struct gendisk *__blk_alloc_disk(int node, struct lock_class_key *lkclass)
 {
 	struct request_queue *q;

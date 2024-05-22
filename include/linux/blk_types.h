@@ -20,24 +20,25 @@ struct cgroup_subsys_state;
 typedef void (bio_end_io_t) (struct bio *);
 struct bio_crypt_ctx;
 
+// 块设备实例(磁盘或磁盘分区)
 struct block_device {
-	sector_t		bd_start_sect;
+	sector_t		bd_start_sect; // 磁盘分区的起始扇区
 	struct disk_stats __percpu *bd_stats;
 	unsigned long		bd_stamp;
 	bool			bd_read_only;	/* read-only policy */
-	dev_t			bd_dev;
-	int			bd_openers;
-	struct inode *		bd_inode;	/* will die */
-	struct super_block *	bd_super;
+	dev_t			bd_dev; // 设备号
+	int			bd_openers; // 打开块设备的进程数
+	struct inode *		bd_inode;	// 块设备文件对应的inode(与用户空间交互的文件)
+	struct super_block *	bd_super; // 块设备文件的超级块信息
 	void *			bd_claiming;
 	struct device		bd_device;
 	void *			bd_holder;
 	int			bd_holders;
 	bool			bd_write_holder;
 	struct kobject		*bd_holder_dir;
-	u8			bd_partno;
+	u8			bd_partno; // 分区号(为0说明不是分区)
 	spinlock_t		bd_size_lock; /* for bd_inode->i_size updates */
-	struct gendisk *	bd_disk;
+	struct gendisk *	bd_disk; // 块设备实例所属的gendisk
 
 	/* The counter of freeze processes */
 	int			bd_fsfreeze_count;
@@ -211,6 +212,8 @@ static inline void bio_issue_init(struct bio_issue *issue,
 /*
  * main unit of I/O for the block layer and lower layers (ie drivers and
  * stacking drivers)
+ * 
+ * 将来自上层的IO请求统一化，并加入到IO请求管理队列中
  */
 struct bio {
 	struct bio		*bi_next;	/* request queue link */
