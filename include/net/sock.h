@@ -349,7 +349,7 @@ struct bpf_local_storage;
   *	@sk_txtime_report_errors: set report errors mode for SO_TXTIME
   *	@sk_txtime_unused: unused txtime flags
   */
-struct sock {
+struct sock { // sock面向内核空间，socket面向用户空间
 	/*
 	 * Now struct inet_timewait_sock also uses sock_common, so please just
 	 * don't add nothing before this first member (__sk_common) --acme
@@ -417,7 +417,7 @@ struct sock {
 	/* ===== mostly read cache line ===== */
 	unsigned int		sk_napi_id;
 #endif
-	int			sk_rcvbuf;
+	int			sk_rcvbuf; // 用户空间socket接收缓存
 
 	struct sk_filter __rcu	*sk_filter;
 	union {

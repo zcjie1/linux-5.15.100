@@ -60,7 +60,7 @@ struct class {
 	struct kobject			*dev_kobj;
 
 	int (*dev_uevent)(struct device *dev, struct kobj_uevent_env *env);
-	char *(*devnode)(struct device *dev, umode_t *mode);
+	char *(*devnode)(struct device *dev, umode_t *mode); // 返回dev的设备类型
 
 	void (*class_release)(struct class *class);
 	void (*dev_release)(struct device *dev);

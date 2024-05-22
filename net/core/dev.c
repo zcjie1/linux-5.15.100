@@ -5299,6 +5299,7 @@ another_round:
 	if (pfmemalloc)
 		goto skip_taps;
 
+	// pcap逻辑，这里会将数据送入抓包点。tcpdump就是从这个入口获取包的
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (pt_prev)
 			ret = deliver_skb(skb, pt_prev, orig_dev);
@@ -5684,6 +5685,8 @@ static void netif_receive_skb_list_internal(struct list_head *head)
 			if (cpu >= 0) {
 				/* Will be handled, remove from list */
 				skb_list_del_init(skb);
+
+				// 若开启了RPS，将数据包放入input_pkt_queue
 				enqueue_to_backlog(skb, cpu, &rflow->last_qtail);
 			}
 		}
@@ -6049,6 +6052,7 @@ static void gro_flush_oldest(struct napi_struct *napi, struct list_head *head)
 	napi_gro_complete(napi, oldest);
 }
 
+// 合并小包
 static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 {
 	u32 bucket = skb_get_hash_raw(skb) & (GRO_HASH_BUCKETS - 1);
@@ -7005,7 +7009,7 @@ static int __napi_poll(struct napi_struct *n, bool *repoll)
 	 */
 	work = 0;
 	if (test_bit(NAPI_STATE_SCHED, &n->state)) {
-		work = n->poll(n, weight);
+		work = n->poll(n, weight); // 调用poll函数
 		trace_napi_poll(n, work, weight);
 	}
 
@@ -7136,6 +7140,7 @@ static int napi_threaded_poll(void *data)
 	return 0;
 }
 
+// 接收网络数据包-软中断处理函数
 static __latent_entropy void net_rx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
@@ -7146,7 +7151,7 @@ static __latent_entropy void net_rx_action(struct softirq_action *h)
 	LIST_HEAD(repoll);
 
 	local_irq_disable();
-	list_splice_init(&sd->poll_list, &list);
+	list_splice_init(&sd->poll_list, &list); // 获取poll函数链表
 	local_irq_enable();
 
 	for (;;) {
@@ -7159,6 +7164,8 @@ static __latent_entropy void net_rx_action(struct softirq_action *h)
 		}
 
 		n = list_first_entry(&list, struct napi_struct, poll_list);
+
+		// 执行poll函数
 		budget -= napi_poll(n, &repoll);
 
 		/* If softirq window is exhausted then punt.
@@ -11611,7 +11618,7 @@ static struct pernet_operations __net_initdata default_device_ops = {
  *       This is called single threaded during boot, so no need
  *       to take the rtnl semaphore.
  */
-static int __init net_dev_init(void)
+static int __init net_dev_init(void) // 网络子系统初始化
 {
 	int i, rc = -ENOMEM;
 
@@ -11632,10 +11639,14 @@ static int __init net_dev_init(void)
 	if (register_pernet_subsys(&netdev_net_ops))
 		goto out;
 
-	/*
-	 *	Initialise the packet receive queues.
+	/**
+	 * Initialise the packet receive queues.
+	 * 
+	 * 初始化数据包接收队列(input_pkt_queue)
+	 * 
+	 * 为每个CPU申请一个softnet_data数据结构
+	 * 其中的poll_list等待网卡驱动程序注册poll函数
 	 */
-
 	for_each_possible_cpu(i) {
 		struct work_struct *flush = per_cpu_ptr(&flush_works, i);
 		struct softnet_data *sd = &per_cpu(softnet_data, i);

@@ -642,8 +642,8 @@ struct inode {
 	struct posix_acl	*i_default_acl;
 #endif
 
-	const struct inode_operations	*i_op;
-	struct super_block	*i_sb;
+	const struct inode_operations	*i_op; // 指向目录操作函数或文件操作函数
+	struct super_block	*i_sb; // 所属的文件系统
 	struct address_space	*i_mapping; // 指向文件的page cache
 
 #ifdef CONFIG_SECURITY
@@ -695,7 +695,7 @@ struct inode {
 	u16			i_wb_frn_avg_time;
 	u16			i_wb_frn_history;
 #endif
-	struct list_head	i_lru;		/* inode LRU list */
+	struct list_head	i_lru;		/* inode LRU list 连接到super_block->s_inode_lru上*/
 	struct list_head	i_sb_list;
 	struct list_head	i_wb_list;	/* backing dev writeback list */
 	union {
@@ -974,6 +974,7 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
 		index <  ra->start + ra->size);
 }
 
+// 用户空间文件
 struct file {
 	union {
 		struct llist_node	fu_llist;
@@ -981,7 +982,7 @@ struct file {
 	} f_u;
 	struct path		f_path;
 	struct inode		*f_inode;	/* cached value 每个文件对应一个inode结构体*/
-	const struct file_operations	*f_op; // 文件相关操作
+	const struct file_operations	*f_op; // 文件(目录)相关操作
 
 	/*
 	 * Protects f_ep, f_flags.
@@ -1480,21 +1481,22 @@ struct sb_writers {
 	struct percpu_rw_semaphore	rw_sem[SB_FREEZE_LEVELS];
 };
 
+// 超级块结构(已挂载文件系统实例)
 struct super_block {
-	struct list_head	s_list;		/* Keep this first */
+	struct list_head	s_list;		/* Keep this first 用于在super_blocks互相连接*/
 	dev_t			s_dev;		/* search index; _not_ kdev_t */
 	unsigned char		s_blocksize_bits;
 	unsigned long		s_blocksize;
 	loff_t			s_maxbytes;	/* Max file size */
-	struct file_system_type	*s_type;
-	const struct super_operations	*s_op;
+	struct file_system_type	*s_type; // 文件系统类型
+	const struct super_operations	*s_op; // 文件系统操作函数
 	const struct dquot_operations	*dq_op;
 	const struct quotactl_ops	*s_qcop;
 	const struct export_operations *s_export_op;
 	unsigned long		s_flags;
 	unsigned long		s_iflags;	/* internal SB_I_* flags */
 	unsigned long		s_magic;
-	struct dentry		*s_root;
+	struct dentry		*s_root; // 根目录
 	struct rw_semaphore	s_umount;
 	int			s_count;
 	atomic_t		s_active;
@@ -1518,7 +1520,7 @@ struct super_block {
 	struct block_device	*s_bdev;
 	struct backing_dev_info *s_bdi;
 	struct mtd_info		*s_mtd;
-	struct hlist_node	s_instances;
+	struct hlist_node	s_instances; // 连接相同文件系统的超级块
 	unsigned int		s_quota_types;	/* Bitmask of supported quota types */
 	struct quota_info	s_dquot;	/* Diskquota specific options */
 
@@ -1599,8 +1601,8 @@ struct super_block {
 	 * of per-node lru lists, each of which has its own spinlock.
 	 * There is no need to put them into separate cachelines.
 	 */
-	struct list_lru		s_dentry_lru;
-	struct list_lru		s_inode_lru;
+	struct list_lru		s_dentry_lru; // 最近使用的目录项链表
+	struct list_lru		s_inode_lru; // 最近使用的文件链表
 	struct rcu_head		rcu;
 	struct work_struct	destroy_work;
 
@@ -2494,10 +2496,10 @@ struct file_system_type {
 	// 清除超级块
 	void (*kill_sb) (struct super_block *);
 
-	// 所属模块
+	// 所属模块(若不属于模块则为NULL)
 	struct module *owner;
 
-	struct file_system_type * next; // file_systems中的连接点
+	struct file_system_type * next; // file_systems统一管理结构中的连接点
 
 	// 哈希桶链表头，管理此文件系统类型的实例(超级块)
 	struct hlist_head fs_supers;

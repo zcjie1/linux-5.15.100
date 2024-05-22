@@ -669,6 +669,7 @@ static int __init igb_init_module(void)
 	return ret;
 }
 
+// igb网卡驱动模块初始化
 module_init(igb_init_module);
 
 /**
@@ -1419,7 +1420,7 @@ static int igb_request_irq(struct igb_adapter *adapter)
 	int err = 0;
 
 	if (adapter->flags & IGB_FLAG_HAS_MSIX) {
-		err = igb_request_msix(adapter);
+		err = igb_request_msix(adapter); //注册中断处理函数
 		if (!err)
 			goto request_done;
 		/* fall back to MSI */
@@ -3250,7 +3251,7 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (err)
 		goto err_sw_init;
 
-	/* setup the private structure, 注册NAPI所需的poll函数 */
+	/* setup the private structure 注册poll函数 */
 	err = igb_sw_init(adapter);
 	if (err)
 		goto err_sw_init;
@@ -4094,6 +4095,7 @@ static int __igb_open(struct net_device *netdev, bool resuming)
 	igb_configure(adapter);
 
 	// 为每个RX接收队列注册中断号
+	// 注册NAPI机制所需的poll函数
 	err = igb_request_irq(adapter);
 	if (err)
 		goto err_req_irq;
@@ -8695,6 +8697,7 @@ static void igb_put_rx_buffer(struct igb_ring *rx_ring,
 	rx_buffer->page = NULL;
 }
 
+// 处理RingBuffer数据包，转换为skb
 static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 {
 	struct igb_adapter *adapter = q_vector->adapter;
@@ -8778,6 +8781,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 			total_bytes += size;
 		} else if (skb)
 			igb_add_rx_frag(rx_ring, rx_buffer, skb, size);
+		// 获取skb
 		else if (ring_uses_build_skb(rx_ring))
 			skb = igb_build_skb(rx_ring, rx_buffer, &xdp,
 					    timestamp);
@@ -8795,7 +8799,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 		igb_put_rx_buffer(rx_ring, rx_buffer, rx_buf_pgcnt);
 		cleaned_count++;
 
-		/* fetch next buffer in frame if non-eop */
+		/* fetch next buffer in frame if non-eop 可能一个帧覆盖多个ringbuffer*/
 		if (igb_is_non_eop(rx_ring, rx_desc))
 			continue;
 
@@ -8810,7 +8814,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 
 		/* populate checksum, timestamp, VLAN, and protocol */
 		igb_process_skb_fields(rx_ring, rx_desc, skb);
-
+		
 		napi_gro_receive(&q_vector->napi, skb);
 
 		/* reset skb pointer */

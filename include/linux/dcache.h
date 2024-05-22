@@ -88,6 +88,7 @@ extern struct dentry_stat_t dentry_stat;
 
 #define d_lock	d_lockref.lock
 
+// 目录结构体
 struct dentry {
 	/* RCU lookup touched fields */
 	unsigned int d_flags;		/* protected by d_lock */
@@ -101,13 +102,13 @@ struct dentry {
 
 	/* Ref lookup also touches following */
 	struct lockref d_lockref;	/* per-dentry lock and refcount */
-	const struct dentry_operations *d_op;
+	const struct dentry_operations *d_op; // 目录操作函数(赋值为特定文件系统的函数)
 	struct super_block *d_sb;	/* The root of the dentry tree */
 	unsigned long d_time;		/* used by d_revalidate */
 	void *d_fsdata;			/* fs-specific data */
 
 	union {
-		struct list_head d_lru;		/* LRU list */
+		struct list_head d_lru;		/* LRU list 连接到super_block->s_dentry_lru上*/
 		wait_queue_head_t *d_wait;	/* in-lookup ones only */
 	};
 	struct list_head d_child;	/* child of parent list */

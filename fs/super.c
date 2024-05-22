@@ -42,6 +42,7 @@
 
 static int thaw_super_locked(struct super_block *sb);
 
+// 超级块管理链表
 static LIST_HEAD(super_blocks);
 static DEFINE_SPINLOCK(sb_lock);
 

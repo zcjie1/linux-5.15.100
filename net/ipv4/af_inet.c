@@ -1929,6 +1929,7 @@ static struct packet_type ip_packet_type __read_mostly = {
 	.list_func = ip_list_rcv,
 };
 
+// 协议栈注册
 static int __init inet_init(void)
 {
 	struct inet_protosw *q;
@@ -1965,6 +1966,7 @@ static int __init inet_init(void)
 
 	/*
 	 *	Add all the base protocols.
+	 *  将协议(传输层)处理函数注册进inet_protos数组中
 	 */
 
 	if (inet_add_protocol(&icmp_protocol, IPPROTO_ICMP) < 0)
@@ -2036,6 +2038,7 @@ static int __init inet_init(void)
 
 	ipfrag_init();
 
+	// 注册ip_rcv函数到ptype_base哈希表中
 	dev_add_pack(&ip_packet_type);
 
 	ip_tunnel_core_init();
