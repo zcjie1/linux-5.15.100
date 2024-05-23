@@ -651,6 +651,7 @@ void tcp_mark_push(struct tcp_sock *tp, struct sk_buff *skb)
 	tp->pushed_seq = tp->write_seq;
 }
 
+// 判断未发送数据是否超过最大窗口的一半
 static inline bool forced_push(const struct tcp_sock *tp)
 {
 	return after(tp->write_seq, tp->pushed_seq + (tp->max_window >> 1));
@@ -1214,6 +1215,8 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 	flags = msg->msg_flags;
 
 	if (flags & MSG_ZEROCOPY && size && sock_flag(sk, SOCK_ZEROCOPY)) {
+
+		// 获取发送队列最后一个空闲skb
 		skb = tcp_write_queue_tail(sk);
 		uarg = msg_zerocopy_realloc(sk, size, skb_zcopy(skb));
 		if (!uarg) {
@@ -1288,6 +1291,7 @@ restart:
 	while (msg_data_left(msg)) {
 		int copy = 0;
 
+		// 获取发送队列最后一个空闲skb
 		skb = tcp_write_queue_tail(sk);
 		if (skb)
 			copy = size_goal - skb->len;
@@ -1305,6 +1309,8 @@ new_segment:
 					goto restart;
 			}
 			first_skb = tcp_rtx_and_write_queues_empty(sk);
+
+			//申请 skb，并添加到发送队列的尾部
 			skb = sk_stream_alloc_skb(sk, 0, sk->sk_allocation,
 						  first_skb);
 			if (!skb)
@@ -1328,10 +1334,12 @@ new_segment:
 		if (copy > msg_data_left(msg))
 			copy = msg_data_left(msg);
 
-		/* Where to copy to? */
+		/* Where to copy to? 判断skb是否有足够空间且不为零拷贝 */
 		if (skb_availroom(skb) > 0 && !zc) {
 			/* We have some space in skb head. Superb! */
 			copy = min_t(int, copy, skb_availroom(skb));
+
+			//拷贝用户空间的数据到内核空间，同时计算校验和
 			err = skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);
 			if (err)
 				goto do_fault;
@@ -1404,10 +1412,14 @@ new_segment:
 		if (skb->len < size_goal || (flags & MSG_OOB) || unlikely(tp->repair))
 			continue;
 
+		// 判断能否发送
 		if (forced_push(tp)) {
 			tcp_mark_push(tp, skb);
+
+			// 发送数据包
 			__tcp_push_pending_frames(sk, mss_now, TCP_NAGLE_PUSH);
 		} else if (skb == tcp_send_head(sk))
+			// 发送数据包
 			tcp_push_one(sk, mss_now);
 		continue;
 
@@ -1427,6 +1439,8 @@ wait_for_space:
 out:
 	if (copied) {
 		tcp_tx_timestamp(sk, sockc.tsflags);
+
+		// 发送数据包
 		tcp_push(sk, flags, mss_now, tp->nonagle, size_goal);
 	}
 out_nopush:

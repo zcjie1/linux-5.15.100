@@ -701,6 +701,11 @@ INDIRECT_CALLABLE_DECLARE(int inet6_sendmsg(struct socket *, struct msghdr *,
 					    size_t));
 static inline int sock_sendmsg_nosec(struct socket *sock, struct msghdr *msg)
 {
+	/** 选择传输函数类
+	 * 1. 自定义类 —— sock->ops->sendmsg
+	 * 2. ipv6类 —— inet6_sendmsg
+	 * 3. 普通ipv4类 —— inet_sendmsg
+	*/
 	int ret = INDIRECT_CALL_INET(sock->ops->sendmsg, inet6_sendmsg,
 				     inet_sendmsg, sock, msg,
 				     msg_data_left(msg));
@@ -2019,10 +2024,13 @@ int __sys_sendto(int fd, void __user *buff, size_t len, unsigned int flags,
 	err = import_single_range(WRITE, buff, len, &iov, &msg.msg_iter);
 	if (unlikely(err))
 		return err;
+	
+	// 根据fd找到socket结构
 	sock = sockfd_lookup_light(fd, &err, &fput_needed);
 	if (!sock)
 		goto out;
 
+	// 构造msghdr
 	msg.msg_name = NULL;
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
@@ -2037,6 +2045,8 @@ int __sys_sendto(int fd, void __user *buff, size_t len, unsigned int flags,
 	if (sock->file->f_flags & O_NONBLOCK)
 		flags |= MSG_DONTWAIT;
 	msg.msg_flags = flags;
+
+	// 发送数据
 	err = sock_sendmsg(sock, &msg);
 
 out_put:
@@ -2045,6 +2055,7 @@ out:
 	return err;
 }
 
+// sento系统调用
 SYSCALL_DEFINE6(sendto, int, fd, void __user *, buff, size_t, len,
 		unsigned int, flags, struct sockaddr __user *, addr,
 		int, addr_len)

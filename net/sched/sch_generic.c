@@ -339,6 +339,7 @@ bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 	if (likely(skb)) {
 		HARD_TX_LOCK(dev, txq, smp_processor_id());
 		if (!netif_xmit_frozen_or_stopped(txq))
+			// 调用网卡驱动函数发送数据包
 			skb = dev_hard_start_xmit(skb, dev, txq, &ret);
 		else
 			qdisc_maybe_clear_missed(q, txq);
@@ -393,7 +394,7 @@ static inline bool qdisc_restart(struct Qdisc *q, int *packets)
 	struct sk_buff *skb;
 	bool validate;
 
-	/* Dequeue packet */
+	/* Dequeue packet 从qdisc中取出要发送的 skb */
 	skb = dequeue_skb(q, &validate, packets);
 	if (unlikely(!skb))
 		return false;
@@ -404,6 +405,7 @@ static inline bool qdisc_restart(struct Qdisc *q, int *packets)
 	dev = qdisc_dev(q);
 	txq = skb_get_tx_queue(dev, skb);
 
+	// 发送
 	return sch_direct_xmit(skb, q, dev, txq, root_lock, validate);
 }
 
@@ -412,13 +414,16 @@ void __qdisc_run(struct Qdisc *q)
 	int quota = READ_ONCE(dev_tx_weight);
 	int packets;
 
+	//循环从队列取出一个 skb 并发送
 	while (qdisc_restart(q, &packets)) {
 		quota -= packets;
+
+		// 若quota用尽
 		if (quota <= 0) {
 			if (q->flags & TCQ_F_NOLOCK)
 				set_bit(__QDISC_STATE_MISSED, &q->state);
 			else
-				__netif_schedule(q);
+				__netif_schedule(q); // 触发一次 NET_TX_SOFTIRQ 类型 softirq
 
 			break;
 		}

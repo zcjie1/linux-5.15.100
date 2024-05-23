@@ -3601,10 +3601,13 @@ struct sk_buff *dev_hard_start_xmit(struct sk_buff *first, struct net_device *de
 	struct sk_buff *skb = first;
 	int rc = NETDEV_TX_OK;
 
+	// 循环发送
 	while (skb) {
 		struct sk_buff *next = skb->next;
 
 		skb_mark_not_on_list(skb);
+
+		// 发送数据包
 		rc = xmit_one(skb, dev, txq, next != NULL);
 		if (unlikely(!dev_xmit_complete(rc))) {
 			skb->next = next;
@@ -3802,6 +3805,7 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 	qdisc_calculate_pkt_len(skb, q);
 
 	if (q->flags & TCQ_F_NOLOCK) {
+		// 如果可以绕开排队系统
 		if (q->flags & TCQ_F_CAN_BYPASS && nolock_qdisc_is_empty(q) &&
 		    qdisc_run_begin(q)) {
 			/* Retest nolock_qdisc_is_empty() within the protection
@@ -3824,7 +3828,10 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 			return NET_XMIT_SUCCESS;
 		}
 
+		// skb入队
 		rc = dev_qdisc_enqueue(skb, q, &to_free, txq);
+
+		// 排队发送
 		qdisc_run(q);
 
 no_lock_out:
@@ -4180,10 +4187,15 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 	else
 		skb_dst_force(skb);
 
+	// 选择发送队列
 	txq = netdev_core_pick_tx(dev, skb, sb_dev);
+
+	// 获取与此队列关联的排队规则
 	q = rcu_dereference_bh(txq->qdisc);
 
 	trace_net_dev_queue(skb);
+
+	// 如果有队列，则调用__dev_xmit_skb 继续处理数据
 	if (q->enqueue) {
 		rc = __dev_xmit_skb(skb, q, dev, txq);
 		goto out;
@@ -4251,6 +4263,7 @@ out:
 	return rc;
 }
 
+// 网络设备子系统——发送数据包
 int dev_queue_xmit(struct sk_buff *skb)
 {
 	return __dev_queue_xmit(skb, NULL);

@@ -121,7 +121,10 @@ int ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	int err;
 
+	// 执行 netfilter 过滤
 	err = __ip_local_out(net, sk, skb);
+
+	//开始发送数据
 	if (likely(err == 1))
 		err = dst_output(net, sk, skb);
 
@@ -219,6 +222,8 @@ static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *s
 	}
 
 	rcu_read_lock_bh();
+
+	// 根据下一跳IP地址寻找邻居(MAC地址)
 	neigh = ip_neigh_for_gw(rt, skb, &is_v6gw);
 	if (!IS_ERR(neigh)) {
 		int res;
@@ -300,6 +305,7 @@ static int __ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *
 	if (skb_is_gso(skb))
 		return ip_finish_output_gso(net, sk, skb, mtu);
 
+	// 大于 mtu 进行分片
 	if (skb->len > mtu || IPCB(skb)->frag_max_size)
 		return ip_fragment(net, sk, skb, mtu, ip_finish_output2);
 
@@ -471,7 +477,7 @@ int __ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	if (rt)
 		goto packet_routed;
 
-	/* Make sure we can route this packet. */
+	/* Make sure we can route this packet. 检查 socket 中是否有缓存的路由表 */
 	rt = (struct rtable *)__sk_dst_check(sk, 0);
 	if (!rt) {
 		__be32 daddr;
@@ -484,6 +490,8 @@ int __ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 		/* If this fails, retransmit mechanism of transport layer will
 		 * keep trying until route appears or the connection times
 		 * itself out.
+		 * 
+		 * 查找路由表，并缓存至socket
 		 */
 		rt = ip_route_output_ports(net, fl4, sk,
 					   daddr, inet->inet_saddr,
@@ -496,6 +504,8 @@ int __ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 			goto no_route;
 		sk_setup_caps(sk, &rt->dst);
 	}
+
+	//为 skb 设置路由表
 	skb_dst_set_noref(skb, &rt->dst);
 
 packet_routed:
@@ -505,6 +515,8 @@ packet_routed:
 	/* OK, we know where to send it, allocate and build IP header. */
 	skb_push(skb, sizeof(struct iphdr) + (inet_opt ? inet_opt->opt.optlen : 0));
 	skb_reset_network_header(skb);
+
+	//设置 IP header
 	iph = ip_hdr(skb);
 	*((__be16 *)iph) = htons((4 << 12) | (5 << 8) | (tos & 0xff));
 	if (ip_dont_fragment(sk, &rt->dst) && !skb->ignore_df)
@@ -529,6 +541,7 @@ packet_routed:
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
 
+	// 发送数据包
 	res = ip_local_out(net, sk, skb);
 	rcu_read_unlock();
 	return res;

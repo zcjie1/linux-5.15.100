@@ -1809,6 +1809,7 @@ static inline struct sk_buff *tcp_write_queue_head(const struct sock *sk)
 	return skb_peek(&sk->sk_write_queue);
 }
 
+// 获取空闲skb发送链表的最后一个元素
 static inline struct sk_buff *tcp_write_queue_tail(const struct sock *sk)
 {
 	return skb_peek_tail(&sk->sk_write_queue);

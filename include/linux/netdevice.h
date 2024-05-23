@@ -5014,7 +5014,7 @@ static inline netdev_tx_t __netdev_start_xmit(const struct net_device_ops *ops,
 					      bool more)
 {
 	__this_cpu_write(softnet_data.xmit.more, more);
-	return ops->ndo_start_xmit(skb, dev);
+	return ops->ndo_start_xmit(skb, dev); // 调用网卡的发送函数
 }
 
 static inline bool netdev_xmit_more(void)
@@ -5025,6 +5025,7 @@ static inline bool netdev_xmit_more(void)
 static inline netdev_tx_t netdev_start_xmit(struct sk_buff *skb, struct net_device *dev,
 					    struct netdev_queue *txq, bool more)
 {
+	// 获取网卡的操作函数合集
 	const struct net_device_ops *ops = dev->netdev_ops;
 	netdev_tx_t rc;
 

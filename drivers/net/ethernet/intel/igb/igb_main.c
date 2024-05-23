@@ -4045,6 +4045,9 @@ static int igb_sw_init(struct igb_adapter *adapter)
 
 /**
  *  __igb_open - Called when a network interface is made active
+ *  
+ *  启动网卡
+ *  
  *  @netdev: network interface device structure
  *  @resuming: indicates whether we are in a resume call
  *
@@ -4075,12 +4078,12 @@ static int __igb_open(struct net_device *netdev, bool resuming)
 
 	netif_carrier_off(netdev);
 
-	/* allocate transmit descriptors */
+	/* allocate transmit descriptors 分配传输描述符数组(RingBuffer) */
 	err = igb_setup_all_tx_resources(adapter);
 	if (err)
 		goto err_setup_tx;
 
-	/* allocate receive descriptors */
+	/* allocate receive descriptors 分配接收描述符数组(RingBuffer) */
 	err = igb_setup_all_rx_resources(adapter);
 	if (err)
 		goto err_setup_rx;
@@ -4131,6 +4134,7 @@ static int __igb_open(struct net_device *netdev, bool resuming)
 		wr32(E1000_CTRL_EXT, reg_data);
 	}
 
+	// 开启全部接收队列
 	netif_tx_start_all_queues(netdev);
 
 	if (!resuming)
@@ -6373,7 +6377,10 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 		return NETDEV_TX_BUSY;
 	}
 
-	/* record the location of the first descriptor for this packet */
+	/** 
+	 * record the location of the first descriptor for this packet
+	 * 获取TX Queue 中下一个可用缓冲区信息
+	 */
 	first = &tx_ring->tx_buffer_info[tx_ring->next_to_use];
 	first->type = IGB_TYPE_SKB;
 	first->skb = skb;
@@ -6413,6 +6420,7 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 	else if (!tso)
 		igb_tx_csum(tx_ring, first);
 
+	// igb_tx_map 将数据映射到DMA区域
 	if (igb_tx_map(tx_ring, first, hdr_len))
 		goto cleanup_tx_tstamp;
 
@@ -6446,6 +6454,7 @@ static inline struct igb_ring *igb_tx_queue_mapping(struct igb_adapter *adapter,
 	return adapter->tx_ring[r_idx];
 }
 
+// igb网卡发送数据包
 static netdev_tx_t igb_xmit_frame(struct sk_buff *skb,
 				  struct net_device *netdev)
 {
