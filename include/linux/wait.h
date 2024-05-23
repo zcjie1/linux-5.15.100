@@ -30,7 +30,7 @@ int default_wake_function(struct wait_queue_entry *wq_entry, unsigned mode, int 
 struct wait_queue_entry {
 	unsigned int		flags;
 	void			*private;
-	wait_queue_func_t	func;
+	wait_queue_func_t	func; // 等待队列回调函数
 	struct list_head	entry;
 };
 

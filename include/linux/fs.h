@@ -974,7 +974,7 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
 		index <  ra->start + ra->size);
 }
 
-// 用户空间文件
+// 用户空间文件结构体
 struct file {
 	union {
 		struct llist_node	fu_llist;
@@ -992,7 +992,7 @@ struct file {
 	enum rw_hint		f_write_hint;
 	atomic_long_t		f_count;
 	unsigned int 		f_flags;
-	fmode_t			f_mode;
+	fmode_t			f_mode; // 文件类型
 	struct mutex		f_pos_lock;
 	loff_t			f_pos;
 	struct fown_struct	f_owner;
@@ -1004,11 +1004,11 @@ struct file {
 	void			*f_security;
 #endif
 	/* needed for tty driver, and maybe others */
-	void			*private_data;
+	void			*private_data; // 可以连接到struct socket, eventpoll等结构体
 
 #ifdef CONFIG_EPOLL
 	/* Used by fs/eventpoll.c to link all the hooks to this file */
-	struct hlist_head	*f_ep;
+	struct hlist_head	*f_ep; // 挂载epitem
 #endif /* #ifdef CONFIG_EPOLL */
 	struct address_space	*f_mapping;
 	errseq_t		f_wb_err;

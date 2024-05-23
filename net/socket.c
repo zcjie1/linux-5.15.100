@@ -459,6 +459,7 @@ struct file *sock_alloc_file(struct socket *sock, int flags, const char *dname)
 	if (!dname)
 		dname = sock->sk ? sock->sk->sk_prot_creator->name : "";
 
+	// file的op属性也被更改了
 	file = alloc_file_pseudo(SOCK_INODE(sock), sock_mnt, dname,
 				O_RDWR | (flags & O_NONBLOCK),
 				&socket_file_ops);
@@ -1289,7 +1290,7 @@ out_release:
 }
 EXPORT_SYMBOL(sock_create_lite);
 
-/* No kernel lock held - perfect */
+/* No kernel lock held - perfect —— epoll注册回调函数时使用*/
 static __poll_t sock_poll(struct file *file, poll_table *wait)
 {
 	struct socket *sock = file->private_data;
@@ -1307,7 +1308,7 @@ static __poll_t sock_poll(struct file *file, poll_table *wait)
 		flag = POLL_BUSY_LOOP;
 	}
 
-	return sock->ops->poll(file, sock, wait) | flag;
+	return sock->ops->poll(file, sock, wait) | flag; // 根据网络协议调用不同的poll函数，比如tcp_poll
 }
 
 static int sock_mmap(struct file *file, struct vm_area_struct *vma)
@@ -1754,10 +1755,12 @@ struct file *do_accept(struct file *file, unsigned file_flags,
 	int err, len;
 	struct sockaddr_storage address;
 
+	// 根据struct file查找到监听的socket
 	sock = sock_from_file(file);
 	if (!sock)
 		return ERR_PTR(-ENOTSOCK);
 
+	// 申请并初始化新的 socket
 	newsock = sock_alloc();
 	if (!newsock)
 		return ERR_PTR(-ENFILE);
@@ -1771,6 +1774,7 @@ struct file *do_accept(struct file *file, unsigned file_flags,
 	 */
 	__module_get(newsock->ops->owner);
 
+	// 申请新的 file 对象，并设置到新 socket 上
 	newfile = sock_alloc_file(newsock, flags, sock->sk->sk_prot_creator->name);
 	if (IS_ERR(newfile))
 		return newfile;
@@ -1779,6 +1783,7 @@ struct file *do_accept(struct file *file, unsigned file_flags,
 	if (err)
 		goto out_fd;
 
+	// 接收连接
 	err = sock->ops->accept(sock, newsock, sock->file->f_flags | file_flags,
 					false);
 	if (err < 0)
@@ -1867,6 +1872,7 @@ SYSCALL_DEFINE4(accept4, int, fd, struct sockaddr __user *, upeer_sockaddr,
 	return __sys_accept4(fd, upeer_sockaddr, upeer_addrlen, flags);
 }
 
+// accept系统调用
 SYSCALL_DEFINE3(accept, int, fd, struct sockaddr __user *, upeer_sockaddr,
 		int __user *, upeer_addrlen)
 {

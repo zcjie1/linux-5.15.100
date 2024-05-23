@@ -122,7 +122,7 @@ struct socket {
 	struct sock		*sk;
 	const struct proto_ops	*ops;
 
-	struct socket_wq	wq;
+	struct socket_wq	wq; // 等待队列
 };
 
 struct vm_area_struct;

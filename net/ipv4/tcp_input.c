@@ -5914,6 +5914,8 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 
 			/* Bulk data transfer: receiver */
 			__skb_pull(skb, tcp_header_len);
+
+			//接收数据到队列中
 			eaten = tcp_queue_rcv(sk, skb, &fragstolen);
 
 			tcp_event_data_recv(sk, skb);
@@ -5932,6 +5934,8 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 no_ack:
 			if (eaten)
 				kfree_skb_partial(skb, fragstolen);
+			
+			// 数据ready，唤醒socket上阻塞掉的进程
 			tcp_data_ready(sk);
 			return;
 		}
