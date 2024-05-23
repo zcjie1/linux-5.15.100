@@ -2061,7 +2061,7 @@ out:
 	return err;
 }
 
-// sento系统调用
+// sendto系统调用
 SYSCALL_DEFINE6(sendto, int, fd, void __user *, buff, size_t, len,
 		unsigned int, flags, struct sockaddr __user *, addr,
 		int, addr_len)
@@ -2517,6 +2517,7 @@ out:
 	return err;
 }
 
+// sendmsg系统调用
 SYSCALL_DEFINE3(sendmsg, int, fd, struct user_msghdr __user *, msg, unsigned int, flags)
 {
 	return __sys_sendmsg(fd, msg, flags, true);

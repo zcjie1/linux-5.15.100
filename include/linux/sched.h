@@ -721,6 +721,7 @@ struct kmap_ctrl {
 #endif
 };
 
+// 进程结构体
 struct task_struct {
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	/*
@@ -1085,7 +1086,7 @@ struct task_struct {
 	struct fs_struct		*fs;
 
 	/* Open file information: */
-	struct files_struct		*files;
+	struct files_struct		*files; // 当前进程打开的文件
 
 #ifdef CONFIG_IO_URING
 	struct io_uring_task		*io_uring;

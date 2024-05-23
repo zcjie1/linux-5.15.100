@@ -319,7 +319,7 @@ struct igb_ring {
 	struct device *dev;		/* device pointer for dma mapping */
 	union {				/* array of buffer info structs */
 		struct igb_tx_buffer *tx_buffer_info;
-		struct igb_rx_buffer *rx_buffer_info;
+		struct igb_rx_buffer *rx_buffer_info; // igb_rx_buffer结构首地址
 	};
 	void *desc;			/* descriptor ring memory */
 	unsigned long flags;		/* ring specific flags */
@@ -554,11 +554,11 @@ struct igb_adapter {
 	u16 tx_work_limit;
 	u32 tx_timeout_count;
 	int num_tx_queues;
-	struct igb_ring *tx_ring[16];
+	struct igb_ring *tx_ring[16]; // 16个发送队列
 
 	/* RX */
 	int num_rx_queues;
-	struct igb_ring *rx_ring[16];
+	struct igb_ring *rx_ring[16]; // 16个接收队列
 
 	u32 max_frame_size;
 	u32 min_frame_size;

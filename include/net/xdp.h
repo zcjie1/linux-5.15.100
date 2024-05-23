@@ -66,11 +66,25 @@ struct xdp_txq_info {
 	struct net_device *dev;
 };
 
+
+/*
+	|-------|        <-  data_hard_start
+	|       |
+	|-------|        <-  data_meta
+	|       |
+	|-------|        <-  data
+	|       |
+	|       |
+	|       |
+	|-------|        <-  data_end
+	|       |
+	|-------|        <-  data_hard_end
+*/
 struct xdp_buff {
-	void *data;
-	void *data_end;
-	void *data_meta;
-	void *data_hard_start;
+	void *data; // payload数据起始地址
+	void *data_end; // payload数据结束地址
+	void *data_meta; // 元数据起始地址
+	void *data_hard_start; // payload前预留一段空间用作元数据填充
 	struct xdp_rxq_info *rxq;
 	struct xdp_txq_info *txq;
 	u32 frame_sz; /* frame size to deduce data_hard_end/reserved tailroom*/

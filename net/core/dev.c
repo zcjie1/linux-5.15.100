@@ -5871,6 +5871,8 @@ static void gro_normal_one(struct napi_struct *napi, struct sk_buff *skb, int se
 {
 	list_add_tail(&skb->list, &napi->rx_list);
 	napi->rx_count += segs;
+
+	// 攒够gro_normal_batch个包，一次性送到协议栈
 	if (napi->rx_count >= gro_normal_batch)
 		gro_normal_list(napi);
 }
@@ -6209,10 +6211,12 @@ static gro_result_t napi_skb_finish(struct napi_struct *napi,
 				    gro_result_t ret)
 {
 	switch (ret) {
+	// 当前skb未被合并，提交
 	case GRO_NORMAL:
 		gro_normal_one(napi, skb, 1);
 		break;
 
+	// 当前skb已经被合并至其他skb，释放skb
 	case GRO_MERGED_FREE:
 		if (NAPI_GRO_CB(skb)->free == NAPI_GRO_FREE_STOLEN_HEAD)
 			napi_skb_free_stolen_head(skb);

@@ -553,12 +553,12 @@ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
 struct skb_shared_info {
 	__u8		flags;
 	__u8		meta_len;
-	__u8		nr_frags;
+	__u8		nr_frags; // frags数组中有效的成员个数
 	__u8		tx_flags;
-	unsigned short	gso_size;
+	unsigned short	gso_size; // 进行 TCP 分段时，每段最大长度，即TCP头部的MSS
 	/* Warning: this field is not always filled in (UFO)! */
 	unsigned short	gso_segs;
-	struct sk_buff	*frag_list;
+	struct sk_buff	*frag_list; // UDP大块数据包需要分为多个Size为MTU的数据包
 	struct skb_shared_hwtstamps hwtstamps;
 	unsigned int	gso_type;
 	u32		tskey;

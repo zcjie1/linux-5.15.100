@@ -4228,6 +4228,7 @@ int igb_setup_tx_resources(struct igb_ring *tx_ring)
 	tx_ring->size = tx_ring->count * sizeof(union e1000_adv_tx_desc);
 	tx_ring->size = ALIGN(tx_ring->size, 4096);
 
+	// 分配DMA区域
 	tx_ring->desc = dma_alloc_coherent(dev, tx_ring->size,
 					   &tx_ring->dma, GFP_KERNEL);
 	if (!tx_ring->desc)
@@ -4368,7 +4369,7 @@ int igb_setup_rx_resources(struct igb_ring *rx_ring)
 	struct device *dev = rx_ring->dev;
 	int size, res;
 
-	/* XDP RX-queue info */
+	/* XDP RX-queue info 初始化xdp_rxq_info */
 	if (xdp_rxq_info_is_reg(&rx_ring->xdp_rxq))
 		xdp_rxq_info_unreg(&rx_ring->xdp_rxq);
 	res = xdp_rxq_info_reg(&rx_ring->xdp_rxq, rx_ring->netdev,
@@ -8694,6 +8695,8 @@ static void igb_put_rx_buffer(struct igb_ring *rx_ring,
 	} else {
 		/* We are not reusing the buffer so unmap it and free
 		 * any references we are holding to it
+		 * 
+		 * 解除DMA映射
 		 */
 		dma_unmap_page_attrs(rx_ring->dev, rx_buffer->dma,
 				     igb_rx_pg_size(rx_ring), DMA_FROM_DEVICE,
@@ -8713,6 +8716,8 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 	struct igb_ring *rx_ring = q_vector->rx.ring;
 	struct sk_buff *skb = rx_ring->skb;
 	unsigned int total_bytes = 0, total_packets = 0;
+
+	// 计算目前空闲的描述符数量
 	u16 cleaned_count = igb_desc_unused(rx_ring);
 	unsigned int xdp_xmit = 0;
 	struct xdp_buff xdp;
@@ -8725,6 +8730,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 #endif
 	xdp_init_buff(&xdp, frame_sz, &rx_ring->xdp_rxq);
 
+	// 当total_packets小于等待处理的数据包数量
 	while (likely(total_packets < budget)) {
 		union e1000_adv_rx_desc *rx_desc;
 		struct igb_rx_buffer *rx_buffer;
@@ -8733,12 +8739,20 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 		unsigned int size;
 		void *pktbuf;
 
-		/* return some buffers to hardware, one at a time is too slow */
+		/** 
+		 * return some buffers to hardware, one at a time is too slow
+		 * 
+		 * 若空闲的描述符数量较多，一起申请对应的rx_buffer
+		 * 避免一个一个申请空间
+		 * 
+		 * 申请新页并映射到DMA(都置位了无视水位线的标志位)
+		 */
 		if (cleaned_count >= IGB_RX_BUFFER_WRITE) {
 			igb_alloc_rx_buffers(rx_ring, cleaned_count);
 			cleaned_count = 0;
 		}
 
+		// 取出下一个可读描述符，并获取接收数据的size
 		rx_desc = IGB_RX_DESC(rx_ring, rx_ring->next_to_clean);
 		size = le16_to_cpu(rx_desc->wb.upper.length);
 		if (!size)
@@ -8750,7 +8764,10 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 		 */
 		dma_rmb();
 
+		// 获取对应的rx_buffer
 		rx_buffer = igb_get_rx_buffer(rx_ring, size, &rx_buf_pgcnt);
+
+		// rx_buff 起始虚拟地址
 		pktbuf = page_address(rx_buffer->page) + rx_buffer->page_offset;
 
 		/* pull rx packet timestamp if available and valid */
@@ -8766,35 +8783,49 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 
 		/* retrieve a buffer from the ring */
 		if (!skb) {
-			unsigned char *hard_start = pktbuf - igb_rx_offset(rx_ring);
-			unsigned int offset = pkt_offset + igb_rx_offset(rx_ring);
 
+			// xdp_buff 起始地址
+			unsigned char *hard_start = pktbuf - igb_rx_offset(rx_ring);
+
+			// xdp_buff data偏移
+			unsigned int offset = pkt_offset + igb_rx_offset(rx_ring);
+			
+			// 初始化xdp_buff
 			xdp_prepare_buff(&xdp, hard_start, offset, size, true);
 #if (PAGE_SIZE > 4096)
 			/* At larger PAGE_SIZE, frame_sz depend on len size */
 			xdp.frame_sz = igb_rx_frame_truesize(rx_ring, size);
 #endif
+			// 执行绑定的XDP程序
 			skb = igb_run_xdp(adapter, rx_ring, &xdp);
 		}
 
-		if (IS_ERR(skb)) {
+		if (IS_ERR(skb)) { // 若skb为错误，说明XDP返回结果不为PASS
+
+			// XDP返回结果
 			unsigned int xdp_res = -PTR_ERR(skb);
 
+			// 若XDP返回结果为XDP_TX或XDP_REDIRECT
 			if (xdp_res & (IGB_XDP_TX | IGB_XDP_REDIR)) {
 				xdp_xmit |= xdp_res;
 				igb_rx_buffer_flip(rx_ring, rx_buffer, size);
 			} else {
+				// 若XDP返回结果为XDP_DROP
 				rx_buffer->pagecnt_bias++;
 			}
 			total_packets++;
 			total_bytes += size;
 		} else if (skb)
+			// 将rx_buffer中的数据页转移到skb中
 			igb_add_rx_frag(rx_ring, rx_buffer, skb, size);
-		// 获取skb
+		
+		// 此时skb为空
 		else if (ring_uses_build_skb(rx_ring))
+			// 零拷贝构造skb
 			skb = igb_build_skb(rx_ring, rx_buffer, &xdp,
 					    timestamp);
 		else
+			// memcpy构造skb
 			skb = igb_construct_skb(rx_ring, rx_buffer,
 						&xdp, timestamp);
 
@@ -8805,14 +8836,30 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 			break;
 		}
 
+		/**
+		 * 将rx_buffer->page置空
+		 * 解除对应page的DMA映射
+		 * 
+		 * 如果可以重用，将 page、dma 等数据移动到rx_ring->next_to_alloc 位置的 rx_buffer；
+		 * 反之，解除 DMA 映射，回收内存
+		 * 
+		 * (都无法重用，因为申请页的时候就置位了PFMEMALLOC)
+		 */
 		igb_put_rx_buffer(rx_ring, rx_buffer, rx_buf_pgcnt);
 		cleaned_count++;
 
-		/* fetch next buffer in frame if non-eop 可能一个帧覆盖多个ringbuffer*/
+		/** 
+		 * fetch next buffer in frame if non-eop 
+		 * 
+		 * 检查 rx_desc 是否包含 eop(End of Packet)
+		 * 
+		 * 若包含，则说明已经收到一个完整的帧
+		 * 若不包含，说明当前帧横跨多个rx_buffer，循环
+		*/
 		if (igb_is_non_eop(rx_ring, rx_desc))
 			continue;
 
-		/* verify the packet layout is correct */
+		/* verify the packet layout is correct 检查网络包skb的头部等信息是否正确 */
 		if (igb_cleanup_headers(rx_ring, rx_desc, skb)) {
 			skb = NULL;
 			continue;
@@ -8824,6 +8871,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 		/* populate checksum, timestamp, VLAN, and protocol */
 		igb_process_skb_fields(rx_ring, rx_desc, skb);
 		
+		// 将构建好的 skb 通过 napi_gro_receive 函数上交到网络协议栈
 		napi_gro_receive(&q_vector->napi, skb);
 
 		/* reset skb pointer */
@@ -8868,14 +8916,14 @@ static bool igb_alloc_mapped_page(struct igb_ring *rx_ring,
 	if (likely(page))
 		return true;
 
-	/* alloc new page for storage */
+	/* alloc new page for storage 分配新的物理页用 */
 	page = dev_alloc_pages(igb_rx_pg_order(rx_ring));
 	if (unlikely(!page)) {
 		rx_ring->rx_stats.alloc_failed++;
 		return false;
 	}
 
-	/* map page for use */
+	/* map page for use 将新的物理页映射到DMA*/
 	dma = dma_map_page_attrs(rx_ring->dev, page, 0,
 				 igb_rx_pg_size(rx_ring),
 				 DMA_FROM_DEVICE,
