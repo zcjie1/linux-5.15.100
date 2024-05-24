@@ -421,7 +421,7 @@ struct sock { // sock面向内核空间，socket面向用户空间
 
 	struct sk_filter __rcu	*sk_filter;
 	union {
-		struct socket_wq __rcu	*sk_wq; // 等待消息的列表
+		struct socket_wq __rcu	*sk_wq; // 等待消息的列表指针, 本体在struct socket中 
 		/* private: */
 		struct socket_wq	*sk_wq_raw;
 		/* public: */
@@ -2269,7 +2269,7 @@ static inline void sock_poll_wait(struct file *filp, struct socket *sock,
 				  poll_table *p)
 {
 	if (!poll_does_not_wait(p)) {
-		poll_wait(filp, &sock->wq.wait, p); // 注册epoll的回调函数
+		poll_wait(filp, &sock->wq.wait, p); // 注册epoll的回调函数到socket的等待队列中
 		/* We need to be sure we are in sync with the
 		 * socket flags modification.
 		 *

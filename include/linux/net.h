@@ -114,12 +114,12 @@ struct socket_wq {
 struct socket {
 	socket_state		state;
 
-	short			type;
+	short			type; //socket类型，如SOCK_STREAM等
 
 	unsigned long		flags;
 
-	struct file		*file;
-	struct sock		*sk;
+	struct file		*file; // 所属的struct file
+	struct sock		*sk; // 对应的struct sock
 	const struct proto_ops	*ops;
 
 	struct socket_wq	wq; // 等待队列

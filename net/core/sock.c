@@ -3054,7 +3054,10 @@ void sock_def_readable(struct sock *sk)
 
 	rcu_read_lock();
 	wq = rcu_dereference(sk->sk_wq);
+
+	// 判断sock等待队列是否为空
 	if (skwq_has_sleeper(wq))
+		//执行等待队列项上的回调函数
 		wake_up_interruptible_sync_poll(&wq->wait, EPOLLIN | EPOLLPRI |
 						EPOLLRDNORM | EPOLLRDBAND);
 	sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_IN);
@@ -3135,7 +3138,7 @@ void sock_init_data_uid(struct socket *sock, struct sock *sk, kuid_t uid)
 
 	if (sock) {
 		sk->sk_type	=	sock->type;
-		RCU_INIT_POINTER(sk->sk_wq, &sock->wq);
+		RCU_INIT_POINTER(sk->sk_wq, &sock->wq); // 初始化等待列表指针
 		sock->sk	=	sk;
 	} else {
 		RCU_INIT_POINTER(sk->sk_wq, NULL);
