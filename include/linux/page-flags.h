@@ -105,7 +105,7 @@
 enum pageflags {
 	PG_locked,		/* Page is locked. Don't touch. */
 	PG_referenced,
-	PG_uptodate,
+	PG_uptodate, /* 页不是最新的 */
 	PG_dirty,
 	PG_lru,
 	PG_active,
@@ -392,7 +392,10 @@ TESTPAGEFLAG(Writeback, writeback, PF_NO_TAIL)
 	TESTSCFLAG(Writeback, writeback, PF_NO_TAIL)
 PAGEFLAG(MappedToDisk, mappedtodisk, PF_NO_TAIL)
 
-/* PG_readahead is only used for reads; PG_reclaim is only for writes */
+/**
+ * PG_readahead is only used for reads; PG_reclaim is only for writes
+ * 预读页优先被回收
+ */
 PAGEFLAG(Reclaim, reclaim, PF_NO_TAIL)
 	TESTCLEARFLAG(Reclaim, reclaim, PF_NO_TAIL)
 PAGEFLAG(Readahead, reclaim, PF_NO_COMPOUND)

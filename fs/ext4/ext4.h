@@ -1747,6 +1747,7 @@ struct ext4_sb_info {
 	struct ext4_fc_replay_state s_fc_replay_state;
 };
 
+// 返回文件系统的特有信息
 static inline struct ext4_sb_info *EXT4_SB(struct super_block *sb)
 {
 	return sb->s_fs_info;
@@ -2206,8 +2207,14 @@ extern int ext4_feature_set_ok(struct super_block *sb, int readonly);
 /*
  * Superblock flags
  */
+
+// EXT4文件系统正在调整大小
 #define EXT4_FLAGS_RESIZING	0
+
+// EXT4文件系统关闭
 #define EXT4_FLAGS_SHUTDOWN	1
+
+// 底层设备支持Direct Access
 #define EXT4_FLAGS_BDEV_IS_DAX	2
 
 static inline int ext4_forced_shutdown(struct ext4_sb_info *sbi)

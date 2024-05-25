@@ -92,7 +92,7 @@ struct task_group;
 /* Used in tsk->state again: */
 #define TASK_PARKED			0x0040 // 用于cpu hotplug
 #define TASK_DEAD			0x0080 // 进程退出，资源回收，等待父进程收尸
-#define TASK_WAKEKILL		0x0100 // 收到kill信号被唤醒
+#define TASK_WAKEKILL		0x0100 // 收到kill信号再被唤醒
 #define TASK_WAKING			0x0200 // 唤醒函数中的状态(wake_up_process->try_to_wake_up)
 #define TASK_NOLOAD			0x0400 // workqueue进程状态
 #define TASK_NEW			0x0800 // fork, clone, kernel_thread创建线程初始

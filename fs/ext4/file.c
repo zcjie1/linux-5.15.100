@@ -112,21 +112,28 @@ static ssize_t ext4_dax_read_iter(struct kiocb *iocb, struct iov_iter *to)
 
 static ssize_t ext4_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
+	// 获取struct file对应的inode节点
 	struct inode *inode = file_inode(iocb->ki_filp);
 
+	// 检测ext4文件系统是否被关闭了
 	if (unlikely(ext4_forced_shutdown(EXT4_SB(inode->i_sb))))
 		return -EIO;
 
+	// 若用户空间缓冲区为0(欲读取字节数为0)
 	if (!iov_iter_count(to))
 		return 0; /* skip atime */
 
+// DAX用于NVM硬盘(直接mmap映射使用，无需内存拷贝)
 #ifdef CONFIG_FS_DAX
 	if (IS_DAX(inode))
 		return ext4_dax_read_iter(iocb, to);
 #endif
+
+	// 绕过page cache，直接将数据从磁盘拷贝至用户空间缓存区
 	if (iocb->ki_flags & IOCB_DIRECT)
 		return ext4_dio_read_iter(iocb, to);
 
+	// 从 page cache 中读取数据
 	return generic_file_read_iter(iocb, to);
 }
 
@@ -918,6 +925,7 @@ loff_t ext4_llseek(struct file *file, loff_t offset, int whence)
 	return vfs_setpos(file, offset, maxbytes);
 }
 
+// ext4文件操作函数
 const struct file_operations ext4_file_operations = {
 	.llseek		= ext4_llseek,
 	.read_iter	= ext4_file_read_iter,

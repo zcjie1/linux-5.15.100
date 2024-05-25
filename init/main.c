@@ -1543,6 +1543,7 @@ static int __ref kernel_init(void *unused)
 
 	do_sysctl_args();
 
+	// initramfs临时终端
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);
 		if (!ret)
@@ -1574,6 +1575,7 @@ static int __ref kernel_init(void *unused)
 			return 0;
 	}
 
+	// 启动用户空间程序
 	if (!try_to_run_init_process("/sbin/init") ||
 	    !try_to_run_init_process("/etc/init") ||
 	    !try_to_run_init_process("/bin/init") ||

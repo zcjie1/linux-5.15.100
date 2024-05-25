@@ -363,6 +363,7 @@ out_putf:
 }
 #endif
 
+// 溢出检测
 int rw_verify_area(int read_write, struct file *file, const loff_t *ppos, size_t count)
 {
 	if (unlikely((ssize_t) count < 0))
@@ -397,12 +398,33 @@ static ssize_t new_sync_read(struct file *filp, char __user *buf, size_t len, lo
 	struct iov_iter iter;
 	ssize_t ret;
 
+	// 利用文件 struct file 初始化 kiocb 结构体
 	init_sync_kiocb(&kiocb, filp);
+
+	// 设置文件读取偏移
 	kiocb.ki_pos = (ppos ? *ppos : 0);
+
+	// 初始化 iov_iter 结构
 	iov_iter_init(&iter, READ, &iov, 1, len);
 
+	// 调用file的read_iter操作函数
 	ret = call_read_iter(filp, &kiocb, &iter);
+
+	/** 
+	 * new_sync_read不允许返回EIOCBQUEUED
+	 * 
+	 * 在早些版本的Linux内核中，do_sync_read(相对于new_sync_read)通过调用aio_read(即无脑异步IO)实现
+	 * 当aio_read返回-EIOCBQUEUED时(表示已经插入IO操作，即异步IO)，do_sync_read会接着调用wait_on_sync_kiocb
+	 * 直到IO操作结束再返回，从而实现read系统调用需要的同步IO
+	 * 
+	 * new_sync_kiocb则不允许返回-EIOCBQUEUED，read_iter函数中必须甄别同步IO和异步IO
+	 * 从而根据IO类型选择不同的IO策略
+	 * 
+	 * 如果返回-EIOCBQUEUED，new_sync_kiocb并没有等待IO结束的函数
+	 * read系统调用所需的同步IO自然无法达成
+	 */
 	BUG_ON(ret == -EIOCBQUEUED);
+
 	if (ppos)
 		*ppos = kiocb.ki_pos;
 	return ret;
@@ -466,29 +488,41 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	ssize_t ret;
 
+	// 检查是否以可读形式打开文件
 	if (!(file->f_mode & FMODE_READ))
 		return -EBADF;
+	
+	// 检查文件是否有read方法
 	if (!(file->f_mode & FMODE_CAN_READ))
 		return -EINVAL;
+	
+	// 检查用户空间缓冲区是否有效
 	if (unlikely(!access_ok(buf, count)))
 		return -EFAULT;
 
+	// 溢出检测
 	ret = rw_verify_area(READ, file, pos, count);
 	if (ret)
 		return ret;
 	if (count > MAX_RW_COUNT)
 		count =  MAX_RW_COUNT;
 
+	// 调用文件操作函数
 	if (file->f_op->read)
 		ret = file->f_op->read(file, buf, count, pos);
 	else if (file->f_op->read_iter)
 		ret = new_sync_read(file, buf, count, pos);
 	else
 		ret = -EINVAL;
+	
 	if (ret > 0) {
+		// 通知文件所属目录，文件被读取
 		fsnotify_access(file);
+
+		// 增加统计计数
 		add_rchar(current, ret);
 	}
+	// read系统调用次数统计
 	inc_syscr(current);
 	return ret;
 }
@@ -611,23 +645,36 @@ static inline loff_t *file_ppos(struct file *file)
 
 ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
 {
+	// 获取fd对应的struct file结构和对应标志位
 	struct fd f = fdget_pos(fd);
+
 	ssize_t ret = -EBADF;
 
+	// 若struct file存在
 	if (f.file) {
-		loff_t pos, *ppos = file_ppos(f.file);
+		loff_t pos;
+
+		// 获取当前文件的读取位置偏移指针，若是流式文件，指针=NULL
+		loff_t *ppos = file_ppos(f.file);
 		if (ppos) {
 			pos = *ppos;
 			ppos = &pos;
 		}
+
+		// 进入虚拟文件系统层，执行具体的文件操作
 		ret = vfs_read(f.file, buf, count, ppos);
+
+		// 更新文件读取位置偏移
 		if (ret >= 0 && ppos)
 			f.file->f_pos = pos;
+		
+		// 减少引用计数
 		fdput_pos(f);
 	}
 	return ret;
 }
 
+// read系统调用
 SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
 {
 	return ksys_read(fd, buf, count);

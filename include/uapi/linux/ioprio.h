@@ -23,6 +23,8 @@
  * high priority NCQ commands. BE is the best-effort scheduling class, the
  * default for any process. IDLE is the idle scheduling class, it is only
  * served when no one else is using the disk.
+ * 
+ * IO优先级
  */
 enum {
 	IOPRIO_CLASS_NONE,

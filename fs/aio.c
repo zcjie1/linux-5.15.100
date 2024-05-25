@@ -2027,6 +2027,8 @@ static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
  *	iocb is invalid.  May fail with -EAGAIN if insufficient resources
  *	are available to queue any iocbs.  Will return 0 if nr is 0.  Will
  *	fail with -ENOSYS if not implemented.
+ * 
+ * 异步IO
  */
 SYSCALL_DEFINE3(io_submit, aio_context_t, ctx_id, long, nr,
 		struct iocb __user * __user *, iocbpp)

@@ -394,7 +394,7 @@ struct sock { // sock面向内核空间，socket面向用户空间
 	int			sk_rcvlowat;
 	struct sk_buff_head	sk_error_queue;
 	struct sk_buff		*sk_rx_skb_cache;
-	struct sk_buff_head	sk_receive_queue; // 空闲skb接收队列
+	struct sk_buff_head	sk_receive_queue; // skb接收队列
 	/*
 	 * The backlog queue is special, it is always used with
 	 * the per-socket spinlock held and requires low latency
@@ -446,7 +446,7 @@ struct sock { // sock面向内核空间，socket面向用户空间
 		struct rb_root	tcp_rtx_queue;
 	};
 	struct sk_buff		*sk_tx_skb_cache;
-	struct sk_buff_head	sk_write_queue; // 空闲skb发送队列
+	struct sk_buff_head	sk_write_queue; // skb发送队列
 	__s32			sk_peek_off;
 	int			sk_write_pending;
 	__u32			sk_dst_pending_confirm;

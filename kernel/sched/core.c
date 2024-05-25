@@ -3787,6 +3787,7 @@ static inline bool ttwu_queue_cond(struct task_struct *p, int cpu)
 
 static bool ttwu_queue_wakelist(struct task_struct *p, int cpu, int wake_flags)
 {
+	// 若task所在CPU与当前CPU不同，将task加入到目标CPU的wake_list中，并发送IPI中断
 	if (sched_feat(TTWU_QUEUE) && ttwu_queue_cond(p, cpu)) {
 		sched_clock_cpu(cpu); /* Sync clocks across CPUs */
 		__ttwu_queue_wakelist(p, cpu, wake_flags);
@@ -4052,6 +4053,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	 * A similar smb_rmb() lives in try_invoke_on_locked_down_task().
 	 */
 	smp_rmb();
+	// 若当前task处在runqueue中, 无需wakeup
 	if (READ_ONCE(p->on_rq) && ttwu_runnable(p, wake_flags))
 		goto unlock;
 
@@ -4124,12 +4126,15 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	smp_cond_load_acquire(&p->on_cpu, !VAL);
 
 	cpu = select_task_rq(p, p->wake_cpu, wake_flags | WF_TTWU);
+
+	// 若task所属CPU不是当前运行的CPU
 	if (task_cpu(p) != cpu) {
 		if (p->in_iowait) {
 			delayacct_blkio_end(p);
 			atomic_dec(&task_rq(p)->nr_iowait);
 		}
-
+		
+		// 转移task至当前CPU
 		wake_flags |= WF_MIGRATED;
 		psi_ttwu_dequeue(p);
 		set_task_cpu(p, cpu);
@@ -4138,6 +4143,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	cpu = task_cpu(p);
 #endif /* CONFIG_SMP */
 
+	// 将task加入当前CPU的runqueue中
 	ttwu_queue(p, cpu, wake_flags);
 unlock:
 	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
@@ -4196,6 +4202,9 @@ bool try_invoke_on_locked_down_task(struct task_struct *p, bool (*func)(struct t
 
 /**
  * wake_up_process - Wake up a specific process
+ * 
+ * 唤醒进程
+ * 
  * @p: The process to be woken up.
  *
  * Attempt to wake up the nominated process and move it to the set of runnable
@@ -6318,9 +6327,10 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 	 *  - ptrace_{,un}freeze_traced() can change ->state underneath us.
 	 */
 	prev_state = READ_ONCE(prev->__state);
-	// if(自愿调度)
+
+	// 自愿调度
 	if (!(sched_mode & SM_MASK_PREEMPT) && prev_state) {
-		if (signal_pending_state(prev_state, prev)) { // 判断是否有未处理信号
+		if (signal_pending_state(prev_state, prev)) { // 判断当前进程能否继续存在于runqueue 
 			WRITE_ONCE(prev->__state, TASK_RUNNING);
 		} else {
 			// 判断当前任务是否对load有贡献
@@ -6346,7 +6356,7 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 			 *
 			 * After this, schedule() must not care about p->state any more.
 			 */
-			deactivate_task(rq, prev, DEQUEUE_SLEEP | DEQUEUE_NOCLOCK); // 将task从runqueue中移除
+			deactivate_task(rq, prev, DEQUEUE_SLEEP | DEQUEUE_NOCLOCK); // 将当前task从runqueue中移除
 
 			if (prev->in_iowait) { // 当前进程处于io等待状态
 				atomic_inc(&rq->nr_iowait);
@@ -6359,7 +6369,7 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 	}
 
 	next = pick_next_task(rq, prev, &rf);
-	clear_tsk_need_resched(prev); // 清除prev任务的 "TIF_NEED_RESCHED" 标记
+	clear_tsk_need_resched(prev); // 清除prev任务(即当前执行这个函数的进程)的 "TIF_NEED_RESCHED" 标记
 	clear_preempt_need_resched(); // 清除抢占任务的 "PREEMPT_NEED_RESCHED" 标记，改变preemmpt count
 #ifdef CONFIG_SCHED_DEBUG
 	rq->last_seen_need_resched_ns = 0;
@@ -6394,7 +6404,7 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 		trace_sched_switch(sched_mode & SM_MASK_PREEMPT, prev, next);
 
 		/* Also unlocks the rq: */
-		rq = context_switch(rq, prev, next, &rf);
+		rq = context_switch(rq, prev, next, &rf); // 进程切换
 	} else {
 		rq->clock_update_flags &= ~(RQCF_ACT_SKIP|RQCF_REQ_SKIP);
 

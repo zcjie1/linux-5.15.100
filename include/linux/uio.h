@@ -33,12 +33,15 @@ struct iov_iter_state {
 	unsigned long nr_segs;
 };
 
+// 对iovec的包装，以兼容readv系统调用使用多个用户缓冲区读取数据
 struct iov_iter {
 	u8 iter_type;
 	bool nofault;
 	bool data_source;
 	size_t iov_offset;
 	size_t count;
+
+	// 对应不同的iter_type
 	union {
 		const struct iovec *iov;
 		const struct kvec *kvec;

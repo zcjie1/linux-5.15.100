@@ -310,7 +310,10 @@ enum rw_hint {
 #define IOCB_HIPRI		(__force int) RWF_HIPRI
 #define IOCB_DSYNC		(__force int) RWF_DSYNC
 #define IOCB_SYNC		(__force int) RWF_SYNC
+
+// 异步IO中只要发生阻塞就返回(如获取锁失败, page cache数据写回)
 #define IOCB_NOWAIT		(__force int) RWF_NOWAIT
+
 #define IOCB_APPEND		(__force int) RWF_APPEND
 
 /* non-RWF related bits - start at 16 */
@@ -323,16 +326,17 @@ enum rw_hint {
 /* can use bio alloc cache */
 #define IOCB_ALLOC_CACHE	(1 << 21)
 
+// kernel io control block
 struct kiocb {
-	struct file		*ki_filp;
+	struct file		*ki_filp; // 欲读取文件的struct file结构
 
 	/* The 'ki_filp' pointer is shared in a union for aio */
 	randomized_struct_fields_start
 
-	loff_t			ki_pos;
-	void (*ki_complete)(struct kiocb *iocb, long ret, long ret2);
+	loff_t			ki_pos; // 文件读取位置偏移
+	void (*ki_complete)(struct kiocb *iocb, long ret, long ret2); // IO完成回调
 	void			*private;
-	int			ki_flags;
+	int			ki_flags; // IO类型，如 Direct IO 或 Buffered IO
 	u16			ki_hint;
 	u16			ki_ioprio; /* See linux/ioprio.h */
 	union {
@@ -458,7 +462,7 @@ int pagecache_write_end(struct file *, struct address_space *mapping,
  * @private_data: For use by the owner of the address_space.
  */
 struct address_space {
-	struct inode		*host;
+	struct inode		*host; // page cache 对应文件的 inode
 
 	struct xarray		i_pages; // page cache
 
@@ -476,9 +480,9 @@ struct address_space {
 	struct rb_root_cached	i_mmap;
 
 	struct rw_semaphore	i_mmap_rwsem;
-	unsigned long		nrpages;
+	unsigned long		nrpages; // page cache个数
 	pgoff_t			writeback_index;
-	const struct address_space_operations *a_ops;
+	const struct address_space_operations *a_ops; // page cache相关操作
 	unsigned long		flags;
 	errseq_t		wb_err;
 	spinlock_t		private_lock;
@@ -633,8 +637,8 @@ struct fsnotify_mark_connector;
 struct inode {
 	umode_t			i_mode; // 文件类型
 	unsigned short		i_opflags;
-	kuid_t			i_uid;
-	kgid_t			i_gid;
+	kuid_t			i_uid; // 文件所有者
+	kgid_t			i_gid; // 文件所有组
 	unsigned int		i_flags;
 
 #ifdef CONFIG_FS_POSIX_ACL
@@ -643,7 +647,7 @@ struct inode {
 #endif
 
 	const struct inode_operations	*i_op; // 指向目录操作函数或文件操作函数
-	struct super_block	*i_sb; // 所属的文件系统
+	struct super_block	*i_sb; // 所属的文件系统super block
 	struct address_space	*i_mapping; // 指向文件的page cache
 
 #ifdef CONFIG_SECURITY
@@ -651,7 +655,7 @@ struct inode {
 #endif
 
 	/* Stat data, not accessed from path walking */
-	unsigned long		i_ino;
+	unsigned long		i_ino; // inode序号
 	/*
 	 * Filesystems may only read i_nlink directly.  They shall use the
 	 * following functions for modification:
@@ -665,9 +669,9 @@ struct inode {
 	};
 	dev_t			i_rdev; // 设备文件主从设备号
 	loff_t			i_size; // 文件所占大小
-	struct timespec64	i_atime;
-	struct timespec64	i_mtime;
-	struct timespec64	i_ctime;
+	struct timespec64	i_atime; // access time
+	struct timespec64	i_mtime; // modify time(更改文件内容)
+	struct timespec64	i_ctime; // change time(更改文件本身)
 	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
 	unsigned short          i_bytes;
 	u8			i_blkbits;
@@ -957,12 +961,12 @@ struct fown_struct {
  * @prev_pos: The last byte in the most recent read request.
  */
 struct file_ra_state {
-	pgoff_t start;
-	unsigned int size;
-	unsigned int async_size;
-	unsigned int ra_pages;
+	pgoff_t start; // 当前窗口第一页的索引
+	unsigned int size; // 当前窗口的页数，-1表示临时禁止预读
+	unsigned int async_size; // 异步预读页面时所剩的页数
+	unsigned int ra_pages; // 文件允许的最大预读页数
 	unsigned int mmap_miss;
-	loff_t prev_pos;
+	loff_t prev_pos; // 进程上一次请求页的索引
 };
 
 /*
@@ -989,15 +993,15 @@ struct file {
 	 * Must not be taken from IRQ context.
 	 */
 	spinlock_t		f_lock;
-	enum rw_hint		f_write_hint;
+	enum rw_hint		f_write_hint; // 写入寿命暗示
 	atomic_long_t		f_count;
-	unsigned int 		f_flags;
+	unsigned int 		f_flags; // 文件标志位，open系统调用中设置
 	fmode_t			f_mode; // 文件类型
 	struct mutex		f_pos_lock;
 	loff_t			f_pos;
 	struct fown_struct	f_owner;
 	const struct cred	*f_cred;
-	struct file_ra_state	f_ra;
+	struct file_ra_state	f_ra; // 文件页预读信息
 
 	u64			f_version;
 #ifdef CONFIG_SECURITY
@@ -2022,10 +2026,19 @@ struct iov_iter;
 struct file_operations {
 	struct module *owner;
 	loff_t (*llseek) (struct file *, loff_t, int);
+
+	// 同步读
 	ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+
+	// 同步写
 	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+
+	// 可异步读+同步读，函数中需要判断是否为异步请求
 	ssize_t (*read_iter) (struct kiocb *, struct iov_iter *);
+
+	// 可异步写+同步写，函数中需要判断是否为异步请求
 	ssize_t (*write_iter) (struct kiocb *, struct iov_iter *);
+
 	int (*iopoll)(struct kiocb *kiocb, bool spin);
 	int (*iterate) (struct file *, struct dir_context *);
 	int (*iterate_shared) (struct file *, struct dir_context *);
@@ -2594,6 +2607,7 @@ extern int generic_update_time(struct inode *, struct timespec64 *, int);
 /* /sys/fs */
 extern struct kobject *fs_kobj;
 
+// 一次读写的最大字节数
 #define MAX_RW_COUNT (INT_MAX & PAGE_MASK)
 
 #ifdef CONFIG_FILE_LOCKING

@@ -660,20 +660,31 @@ bool filemap_range_needs_writeback(struct address_space *mapping,
 	pgoff_t max = end_byte >> PAGE_SHIFT;
 	struct page *page;
 
+	// 当 page cache 中没有page时，无需writeback
 	if (!mapping_needs_writeback(mapping))
 		return false;
+	
+	// 当page cache并未标记DIRDY和WRITEBACK标志位时，无需wirteback
 	if (!mapping_tagged(mapping, PAGECACHE_TAG_DIRTY) &&
 	    !mapping_tagged(mapping, PAGECACHE_TAG_WRITEBACK))
 		return false;
+	
 	if (end_byte < start_byte)
 		return false;
 
 	rcu_read_lock();
 	xas_for_each(&xas, page, max) {
+
+		// 返回page为0
 		if (xas_retry(&xas, page))
 			continue;
+
+		// 返回page为value，而不是指针
 		if (xa_is_value(page))
 			continue;
+		
+		// 若 page置位了PG_dirty位 || page置位了PG_lock || page置位了PG_writeback
+		// 则 page 需要被写回磁盘
 		if (PageDirty(page) || PageLocked(page) || PageWriteback(page))
 			break;
 	}
@@ -2339,23 +2350,35 @@ static void filemap_get_read_batch(struct address_space *mapping,
 
 	rcu_read_lock();
 	for (head = xas_load(&xas); head; head = xas_next(&xas)) {
+		// 若head为空，continue
 		if (xas_retry(&xas, head))
 			continue;
+		
+		// 若遍历到的index超过阈值 || head不是指针
 		if (xas.xa_index > max || xa_is_value(head))
 			break;
+
+		// 若page的引用计数为0，即page被free或即将被free
 		if (!page_cache_get_speculative(head))
-			goto retry;
+			goto retry; // 有bug，retry需要释放xarray的锁
 
 		/* Has the page moved or been split? */
 		if (unlikely(head != xas_reload(&xas)))
 			goto put_page;
 
+		// 当pagevec被装满，break
 		if (!pagevec_add(pvec, head))
 			break;
+		
+		// 若page不是最新的，break
 		if (!PageUptodate(head))
 			break;
+		
+		// 若page是预读页，break
 		if (PageReadahead(head))
 			break;
+		
+		// 若page是复合页首页
 		if (PageHead(head)) {
 			xas_set(&xas, head->index + thp_nr_pages(head));
 			/* Handle wrap correctly */
@@ -2527,6 +2550,12 @@ static int filemap_readahead(struct kiocb *iocb, struct file *file,
 	return 0;
 }
 
+/**
+ * 在 page cache 中查找是否有读取数据在内存中的缓存页
+ * 
+ * 若要读取的文件数据在 page cache 中没有对应的缓存页，则从磁盘中读取文件数据
+ * 并同步预读若干相邻的数据块到 page cache中
+*/
 static int filemap_get_pages(struct kiocb *iocb, struct iov_iter *iter,
 		struct pagevec *pvec)
 {
@@ -2541,20 +2570,32 @@ static int filemap_get_pages(struct kiocb *iocb, struct iov_iter *iter,
 	/* "last_index" is the index of the page beyond the end of the read */
 	last_index = DIV_ROUND_UP(iocb->ki_pos + iter->count, PAGE_SIZE);
 retry:
+	// 当前进程收到致命信号，直接退出
 	if (fatal_signal_pending(current))
 		return -EINTR;
 
+	// 读取page cache中的页至pvec中
 	filemap_get_read_batch(mapping, index, last_index - 1, pvec);
+
+	// 若一页都未读取到
 	if (!pagevec_count(pvec)) {
 		if (iocb->ki_flags & IOCB_NOIO)
 			return -EAGAIN;
+
+		// 从磁盘读取对应文件页和预取文件页，并更新至page cache
 		page_cache_sync_readahead(mapping, ra, filp, index,
 				last_index - index);
+
+		// 重新读取page cache
 		filemap_get_read_batch(mapping, index, last_index - 1, pvec);
 	}
+
+	// 若仍未从page cache中读取到文件
 	if (!pagevec_count(pvec)) {
 		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_WAITQ))
 			return -EAGAIN;
+		
+		// 分配新页并加入到page cache中
 		err = filemap_create_page(filp, mapping,
 				iocb->ki_pos >> PAGE_SHIFT, pvec);
 		if (err == AOP_TRUNCATED_PAGE)
@@ -2563,11 +2604,15 @@ retry:
 	}
 
 	page = pvec->pages[pagevec_count(pvec) - 1];
+
+	// 处理预读页
 	if (PageReadahead(page)) {
 		err = filemap_readahead(iocb, filp, mapping, page, last_index);
 		if (err)
 			goto err;
 	}
+
+	// 处理未更新最新数据的页
 	if (!PageUptodate(page)) {
 		if ((iocb->ki_flags & IOCB_WAITQ) && pagevec_count(pvec) > 1)
 			iocb->ki_flags |= IOCB_NOWAIT;
@@ -2589,6 +2634,9 @@ err:
 
 /**
  * filemap_read - Read data from the page cache.
+ * 
+ * 从page cache中读取数据
+ * 
  * @iocb: The iocb to read.
  * @iter: Destination for the data.
  * @already_read: Number of bytes already read by the caller.
@@ -2612,12 +2660,18 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 	bool writably_mapped;
 	loff_t isize, end_offset;
 
+	// 若文件读取位置偏移超出文件系统文件size最大值
 	if (unlikely(iocb->ki_pos >= inode->i_sb->s_maxbytes))
 		return 0;
+	
+	// 若欲读取字节为0
 	if (unlikely(!iov_iter_count(iter)))
 		return 0;
 
+	// 限定读取字节数
 	iov_iter_truncate(iter, inode->i_sb->s_maxbytes);
+
+	// pagevec初始化
 	pagevec_init(&pvec);
 
 	do {
@@ -2631,6 +2685,14 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 		if ((iocb->ki_flags & IOCB_WAITQ) && already_read)
 			iocb->ki_flags |= IOCB_NOWAIT;
 
+		/**
+		 * 在 page cache 中查找是否有读取数据在内存中的缓存页
+		 * 
+		 * 若要读取的文件数据在 page cache 中没有对应的缓存页，则从磁盘中读取文件数据
+		 * 并同步预读若干相邻的数据块到 page cache中
+		 * 
+		 * 再一次触发缓存页的查找
+		*/
 		error = filemap_get_pages(iocb, iter, &pvec);
 		if (error < 0)
 			break;
@@ -2643,16 +2705,19 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 		 * part of the page is not copied back to userspace (unless
 		 * another truncate extends the file - this is desired though).
 		 */
-		isize = i_size_read(inode);
+		isize = i_size_read(inode); // 获取文件size
+
+		// 若文件读取偏移位置大于文件size
 		if (unlikely(iocb->ki_pos >= isize))
 			goto put_pages;
+		
 		end_offset = min_t(loff_t, isize, iocb->ki_pos + iter->count);
 
 		/*
 		 * Once we start copying data, we don't want to be touching any
 		 * cachelines that might be contended:
 		 */
-		writably_mapped = mapping_writably_mapped(mapping);
+		writably_mapped = mapping_writably_mapped(mapping); // 是否有写共享页映射
 
 		/*
 		 * When a sequential read accesses a page several times, only
@@ -2686,6 +2751,7 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 					flush_dcache_page(page + j);
 			}
 
+			// 将 page cache 中的数据拷贝到用户空间缓冲区
 			copied = copy_page_to_iter(page, offset, bytes, iter);
 
 			already_read += copied;
@@ -2703,8 +2769,10 @@ put_pages:
 		pagevec_reinit(&pvec);
 	} while (iov_iter_count(iter) && iocb->ki_pos < isize && !error);
 
+	// 更新文件最近访问时间
 	file_accessed(filp);
 
+	// 返回读取字节数或错误
 	return already_read ? already_read : error;
 }
 EXPORT_SYMBOL_GPL(filemap_read);
@@ -2736,21 +2804,28 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	size_t count = iov_iter_count(iter);
 	ssize_t retval = 0;
 
+	// 若用户空间缓冲区为0(欲读取字节数为0)
 	if (!count)
 		return 0; /* skip atime */
-
+	
+	// 对iomap based的文件系统无效
 	if (iocb->ki_flags & IOCB_DIRECT) {
 		struct file *file = iocb->ki_filp;
-		struct address_space *mapping = file->f_mapping;
+		struct address_space *mapping = file->f_mapping; // page cache管理结构体
 		struct inode *inode = mapping->host;
 		loff_t size;
 
+		// 获取文件size
 		size = i_size_read(inode);
+
 		if (iocb->ki_flags & IOCB_NOWAIT) {
+			// 若有读取范围内的page需要被写回磁盘(即当前磁盘上的数据无效)且不允许等待，返回错误
 			if (filemap_range_needs_writeback(mapping, iocb->ki_pos,
 						iocb->ki_pos + count - 1))
 				return -EAGAIN;
 		} else {
+			// 将page cache中待读数据写入磁盘(保证磁盘待读数据的正确性)
+			// 因为Direct-IO直接从磁盘读取数据
 			retval = filemap_write_and_wait_range(mapping,
 						iocb->ki_pos,
 					        iocb->ki_pos + count - 1);
@@ -2758,13 +2833,19 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 				return retval;
 		}
 
+		// 更新inode的access time
 		file_accessed(file);
 
+		// 执行page cache的direct_IO函数
 		retval = mapping->a_ops->direct_IO(iocb, iter);
+
+		// 更新文件读取位置和欲读取字节数
 		if (retval >= 0) {
 			iocb->ki_pos += retval;
 			count -= retval;
 		}
+
+		// 若返回不是"IO请求已被插入队列"
 		if (retval != -EIOCBQUEUED)
 			iov_iter_revert(iter, count - iov_iter_count(iter));
 
@@ -2782,6 +2863,7 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 			return retval;
 	}
 
+	// Buffered IO
 	return filemap_read(iocb, iter, retval);
 }
 EXPORT_SYMBOL(generic_file_read_iter);

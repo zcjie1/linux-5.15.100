@@ -399,14 +399,20 @@ static inline int fatal_signal_pending(struct task_struct *p)
 
 static inline int signal_pending_state(unsigned int state, struct task_struct *p)
 {
-	if (!(state & (TASK_INTERRUPTIBLE | TASK_WAKEKILL))) // 若此进程不可中断且不能kill
+	// 若当前进程状态不为TASK_INTERRUPTIBLE或TASK_WAKEKILL
+	if (!(state & (TASK_INTERRUPTIBLE | TASK_WAKEKILL)))
 		return 0;
+	
+	/*
+	 程序走到这里说明，state一定包含TASK_INTERRUPTIBLE 和 TASK_WAKEKILL 两种状态之一
+	 这时检查TIF_SIGPENDING 标记是否设置。没有该标记，直接返回0
+    */
 	if (!signal_pending(p)) // 若此进程没有挂起的信号(包括中断信号)
 		return 0;
 
 	/**
 	 * 走到这一步说明一定有信号被挂起了
-	 * 如果TASK_INTERRUPTIBLE 或 TASK_WAKEKILL，而且有信号挂起或者收到kill信号
+	 * 进程状态为TASK_INTERRUPTIBLE 或 TASK_WAKEKILL，而且有信号挂起或者收到kill信号
 	*/
 	return (state & TASK_INTERRUPTIBLE) || __fatal_signal_pending(p);
 }

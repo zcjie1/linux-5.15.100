@@ -50,7 +50,7 @@ struct files_struct {
   /*
    * read mostly part
    */
-	atomic_t count;
+	atomic_t count; // 共享此文件描述符表的进程数
 	bool resize_in_progress;
 	wait_queue_head_t resize_wait;
 

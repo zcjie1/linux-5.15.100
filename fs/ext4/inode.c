@@ -3622,6 +3622,7 @@ static int ext4_iomap_swap_activate(struct swap_info_struct *sis,
 				       &ext4_iomap_report_ops);
 }
 
+// ext4文件系统 page cache 操作函数
 static const struct address_space_operations ext4_aops = {
 	.readpage		= ext4_readpage,
 	.readahead		= ext4_readahead,

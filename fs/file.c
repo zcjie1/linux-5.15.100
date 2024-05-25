@@ -1038,12 +1038,12 @@ static unsigned long __fget_light(unsigned int fd, fmode_t mask)
 	 * atomic_read_acquire() pairs with atomic_dec_and_test() in
 	 * put_files_struct().
 	 */
-	if (atomic_read_acquire(&files->count) == 1) {
+	if (atomic_read_acquire(&files->count) == 1) { // 若是当前进程独享fdt表
 		file = files_lookup_fd_raw(files, fd);
 		if (!file || unlikely(file->f_mode & mask))
 			return 0;
 		return (unsigned long)file;
-	} else {
+	} else { // 多进程共享fdt时，使用rcu读取
 		file = __fget(fd, mask, 1);
 		if (!file)
 			return 0;

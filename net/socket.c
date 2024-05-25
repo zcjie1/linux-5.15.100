@@ -147,6 +147,7 @@ static void sock_show_fdinfo(struct seq_file *m, struct file *f)
  *	in the operation structures but are done directly via the socketcall() multiplexor.
  */
 
+// socket文件操作函数，赋值给struct file中f_op变量
 static const struct file_operations socket_file_ops = {
 	.owner =	THIS_MODULE,
 	.llseek =	no_llseek,

@@ -17,6 +17,7 @@
 struct page;
 struct address_space;
 
+// page批处理
 struct pagevec {
 	unsigned char nr;
 	bool percpu_pvec_drained;

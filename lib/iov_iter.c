@@ -1092,11 +1092,16 @@ EXPORT_SYMBOL(iov_iter_advance);
 
 void iov_iter_revert(struct iov_iter *i, size_t unroll)
 {
+	// 若一个字节都没读，返回
 	if (!unroll)
 		return;
+	
 	if (WARN_ON(unroll > MAX_RW_COUNT))
 		return;
+	
+	// 更新iov_iter的欲读取字节数
 	i->count += unroll;
+
 	if (unlikely(iov_iter_is_pipe(i))) {
 		struct pipe_inode_info *pipe = i->pipe;
 		unsigned int p_mask = pipe->ring_size - 1;

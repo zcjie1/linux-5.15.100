@@ -16,8 +16,11 @@
 
 struct iovec
 {
-	void __user *iov_base;	/* BSD uses caddr_t (1003.1g requires void *) */
-	__kernel_size_t iov_len; /* Must be size_t (1003.1g) */
+	/*用户缓冲区基地址 —— BSD uses caddr_t (1003.1g requires void *) */
+	void __user *iov_base;
+
+	/*用户缓冲区长度(读取字节数) —— Must be size_t (1003.1g) */
+	__kernel_size_t iov_len; 
 };
 
 /*

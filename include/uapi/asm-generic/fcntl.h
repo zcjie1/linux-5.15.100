@@ -39,7 +39,7 @@
 #define O_NONBLOCK	00004000
 #endif
 #ifndef O_DSYNC
-#define O_DSYNC		00010000	/* used to be O_SYNC, see below */
+#define O_DSYNC		00010000	/*同步文件数据和部分元数据 used to be O_SYNC, see below */
 #endif
 #ifndef FASYNC
 #define FASYNC		00020000	/* fcntl, for BSD compatibility */
@@ -77,6 +77,7 @@
  * Note: __O_SYNC must never be used directly.
  */
 #ifndef O_SYNC
+// 同步文件数据和全部元数据
 #define __O_SYNC	04000000
 #define O_SYNC		(__O_SYNC|O_DSYNC)
 #endif

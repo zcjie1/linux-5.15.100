@@ -113,7 +113,7 @@ static struct file *__alloc_file(int flags, const struct cred *cred)
 	rwlock_init(&f->f_owner.lock);
 	spin_lock_init(&f->f_lock);
 	mutex_init(&f->f_pos_lock);
-	f->f_flags = flags;
+	f->f_flags = flags; // 设置文件标志位，如O_RDONLY
 	f->f_mode = OPEN_FMODE(flags);
 	/* f->f_version: 0 */
 
@@ -328,6 +328,7 @@ static DECLARE_DELAYED_WORK(delayed_fput_work, delayed_fput);
 
 void fput_many(struct file *file, unsigned int refs)
 {
+	// 若file的引用计数下降为0
 	if (atomic_long_sub_and_test(refs, &file->f_count)) {
 		struct task_struct *task = current;
 
