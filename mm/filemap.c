@@ -2551,6 +2551,8 @@ static int filemap_readahead(struct kiocb *iocb, struct file *file,
 {
 	if (iocb->ki_flags & IOCB_NOIO)
 		return -EAGAIN;
+	
+	// 将page->index到last_index的page都异步预读
 	page_cache_async_readahead(mapping, &file->f_ra, file, page,
 			page->index, last_index - page->index);
 	return 0;
