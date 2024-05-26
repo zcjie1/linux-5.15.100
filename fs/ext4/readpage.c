@@ -247,15 +247,18 @@ int ext4_mpage_readpages(struct inode *inode,
 	map.m_len = 0;
 	map.m_flags = 0;
 
+	//依次取出nr_pages个page，最后执行submit_bio，把page文件页对应的磁盘数据从对应磁盘物理记录块读取到page文件页内存
 	for (; nr_pages; nr_pages--) {
 		int fully_mapped = 1;
 		unsigned first_hole = blocks_per_page;
 
 		if (rac) {
+			// 获取下一个page cache中的页
 			page = readahead_page(rac);
 			prefetchw(&page->flags);
 		}
 
+		// 若为私有页，跳转至confused
 		if (page_has_buffers(page))
 			goto confused;
 
@@ -366,6 +369,8 @@ int ext4_mpage_readpages(struct inode *inode,
 			submit_bio(bio);
 			bio = NULL;
 		}
+
+		// 设置BIO
 		if (bio == NULL) {
 			/*
 			 * bio_alloc will _always_ be able to allocate a bio if

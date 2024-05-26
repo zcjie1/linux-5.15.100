@@ -3226,6 +3226,7 @@ static int ext4_readpage(struct file *file, struct page *page)
 	return ret;
 }
 
+// ext4预取文件页
 static void ext4_readahead(struct readahead_control *rac)
 {
 	struct inode *inode = rac->mapping->host;

@@ -203,6 +203,20 @@ int ksys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 	return ret;
 }
 
+/**
+ * posix_fadvise系统调用 —— 更改已打开文件的调优预读算法
+ * 
+ * advice主要参数:
+ *  1. POSIX_FADV_NORMAL: 设置文件最大预读页数 ra_pages 为默认值 32 页
+ *  2. POSIX_FADV_SEQUENTIAL: 进程期望顺序访问指定的文件数据，ra_pages 值为默认值的两倍
+ *  3. POSIX_FADV_RANDOM: 进程期望以随机顺序访问指定的文件数据。ra_pages 设置为 0，表示禁止预读
+ *  4. POSIX_FADV_WILLNEED: 通知内核，进程指定这段文件数据将在不久之后被访问
+ * 
+ * 后来人们发现当禁止预读后，一页一页的读取性能非常的低下, 
+ * 于是 linux 3.19.8 之后 POSIX_FADV_RANDOM 的语义被改变了, 
+ * 它会在 file->f_flags 中设置 FMODE_RANDOM 属性, 
+ * 当遇到 FMODE_RANDOM 的时候内核就会走强制预读的逻辑，按最大 2MB 单元大小的 chunk 进行预读。
+*/
 SYSCALL_DEFINE4(fadvise64_64, int, fd, loff_t, offset, loff_t, len, int, advice)
 {
 	return ksys_fadvise64_64(fd, offset, len, advice);

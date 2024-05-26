@@ -985,6 +985,10 @@ int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 }
 EXPORT_SYMBOL(add_to_page_cache_locked);
 
+/**
+ * 将page加入page cache和LRU链表中
+ * LRU链表用于当系统内存不足时，对页缓存进行清理时使用
+*/
 int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 				pgoff_t offset, gfp_t gfp_mask)
 {
@@ -2334,7 +2338,9 @@ static void shrink_readahead_size_eio(struct file_ra_state *ra)
 }
 
 /*
- * filemap_get_read_batch - Get a batch of pages for read
+ * filemap_get_read_batch - Get a batch of pages for read, 
+ * 
+ * 读取page cache中的页至pvec中，
  *
  * Get a batch of pages which represent a contiguous range of bytes
  * in the file.  No tail pages will be returned.  If @index is in the
@@ -2595,7 +2601,7 @@ retry:
 		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_WAITQ))
 			return -EAGAIN;
 		
-		// 分配新页并加入到page cache中
+		// 分配新页加入到page cache并读取
 		err = filemap_create_page(filp, mapping,
 				iocb->ki_pos >> PAGE_SHIFT, pvec);
 		if (err == AOP_TRUNCATED_PAGE)
@@ -2690,8 +2696,6 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 		 * 
 		 * 若要读取的文件数据在 page cache 中没有对应的缓存页，则从磁盘中读取文件数据
 		 * 并同步预读若干相邻的数据块到 page cache中
-		 * 
-		 * 再一次触发缓存页的查找
 		*/
 		error = filemap_get_pages(iocb, iter, &pvec);
 		if (error < 0)
@@ -2722,11 +2726,14 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 		/*
 		 * When a sequential read accesses a page several times, only
 		 * mark it as accessed the first time.
+		 * 
+		 * 若此次文件读取位置为新的一页，标记页为accessed
 		 */
 		if (iocb->ki_pos >> PAGE_SHIFT !=
 		    ra->prev_pos >> PAGE_SHIFT)
 			mark_page_accessed(pvec.pages[0]);
 
+		// 遍历pvec中读取的所有页
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 			size_t page_size = thp_size(page);

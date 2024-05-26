@@ -964,7 +964,7 @@ struct file_ra_state {
 	pgoff_t start; // 当前窗口第一页的索引
 	unsigned int size; // 当前窗口的页数，-1表示临时禁止预读
 	unsigned int async_size; // 异步预读页面时所剩的页数
-	unsigned int ra_pages; // 文件允许的最大预读页数
+	unsigned int ra_pages; // 文件允许的最大预读页数，默认为32页
 	unsigned int mmap_miss;
 	loff_t prev_pos; // 进程上一次请求页的索引
 };

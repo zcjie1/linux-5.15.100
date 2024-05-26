@@ -788,8 +788,8 @@ struct readahead_control {
 	struct address_space *mapping;
 	struct file_ra_state *ra;
 /* private: use the readahead_* accessors instead */
-	pgoff_t _index;
-	unsigned int _nr_pages;
+	pgoff_t _index; // 当前读取page cache中的页使用的index
+	unsigned int _nr_pages; // 已预读的页数
 	unsigned int _batch_count;
 };
 
@@ -813,6 +813,9 @@ void readahead_expand(struct readahead_control *ractl,
 
 /**
  * page_cache_sync_readahead - generic file readahead
+ * 
+ * 从磁盘读取对应文件页和预取文件页，并更新至page cache
+ * 
  * @mapping: address_space which holds the pagecache and I/O vectors
  * @ra: file_ra_state which holds the readahead state
  * @file: Used by the filesystem for authentication.
@@ -835,6 +838,9 @@ void page_cache_sync_readahead(struct address_space *mapping,
 
 /**
  * page_cache_async_readahead - file readahead for marked pages
+ * 
+ * 异步读取预取页
+ * 
  * @mapping: address_space which holds the pagecache and I/O vectors
  * @ra: file_ra_state which holds the readahead state
  * @file: Used by the filesystem for authentication.
@@ -858,6 +864,9 @@ void page_cache_async_readahead(struct address_space *mapping,
 
 /**
  * readahead_page - Get the next page to read.
+ * 
+ * 从page cache管理树中读取一个page
+ * 
  * @rac: The current readahead request.
  *
  * Context: The page is locked and has an elevated refcount.  The caller
