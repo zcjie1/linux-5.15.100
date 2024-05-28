@@ -289,8 +289,8 @@ void __init idt_setup_apic_and_irq_gates(void)
 	idt_setup_from_table(idt_table, apic_idts, ARRAY_SIZE(apic_idts), true);
 
 	/**
-	 * 将剩余中断的入口都设置为irq_entries_start
-	 * irq_entries_start跳转到common_interrupt函数
+	 * 将剩余中断的入口都设置为irq_entries_start[i]
+	 * irq_entries_start[i]跳转到common_interrupt函数
 	 * common_interrupt函数会根据中断向量号去读取per CPU的数组变量vector_irq
 	 * 得到一个irq_desc
 	 * 最终调用irq_desc中的handle_irq

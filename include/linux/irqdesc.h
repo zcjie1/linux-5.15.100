@@ -19,6 +19,9 @@ struct pt_regs;
 
 /**
  * struct irq_desc - interrupt descriptor
+ * 
+ * 中断描述符 —— 与IRQ号一一对应
+ * 
  * @irq_common_data:	per irq and chip data passed down to chip functions
  * @kstat_irqs:		irq stats per cpu
  * @handle_irq:		highlevel irq-events handler
@@ -56,8 +59,8 @@ struct irq_desc {
 	struct irq_common_data	irq_common_data;
 	struct irq_data		irq_data;
 	unsigned int __percpu	*kstat_irqs;
-	irq_flow_handler_t	handle_irq;
-	struct irqaction	*action;	/* IRQ action list */
+	irq_flow_handler_t	handle_irq; // 处理中断的函数
+	struct irqaction	*action;	/* IRQ action list —— 表示设备对中断的处理，不同设备列表中不同元素 */
 	unsigned int		status_use_accessors;
 	unsigned int		core_internal_state__do_not_mess_with_it;
 	unsigned int		depth;		/* nested irq disables */

@@ -251,10 +251,10 @@ static __always_inline void handle_irq(struct irq_desc *desc,
 首先，宏展开后的 func 函数会执行以下操作：
  1. 进入中断入口（irqentry_enter）状态
  2. 从 error_code 中提取 vector
- 3. 开始仪器化（instrumentation_begin）
+ 3. instrumentation_begin
  4. 设置 L1TF 刷新 L1D 缓存（kvm_set_cpu_l1tf_flush_l1d）
  5. 在 IRQ 栈上运行 __func 函数
- 6. 结束仪器化（instrumentation_end）
+ 6. instrumentation_end
  7. 退出中断入口状态（irqentry_exit）
  */
 DEFINE_IDTENTRY_IRQ(common_interrupt)

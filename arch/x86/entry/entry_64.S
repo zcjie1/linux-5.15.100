@@ -415,6 +415,8 @@ SYM_CODE_END(\asmsym)
 
 /*
  * Interrupt entry/exit.
+ * 
+ * 设置中断入口
  *
  + The interrupt stubs push (vector) onto the stack, which is the error_code
  * position of idtentry exceptions, and jump to one of the two idtentry points
@@ -600,6 +602,7 @@ SYM_CODE_END(\asmsym)
 	.globl __irqentry_text_start
 __irqentry_text_start:
 
+/* C语言和汇编语言包含相同的头文件时，根据__ASSEMBLY__符号导入不同的内容 */
 #include <asm/idtentry.h>
 
 	.align 16

@@ -116,14 +116,14 @@ typedef irqreturn_t (*irq_handler_t)(int, void *);
  * @dir:	pointer to the proc/irq/NN/name entry
  */
 struct irqaction {
-	irq_handler_t		handler;
+	irq_handler_t		handler; // 中断处理函数，由irq_desc中的handle_irq调用
 	void			*dev_id;
 	void __percpu		*percpu_dev_id;
 	struct irqaction	*next;
-	irq_handler_t		thread_fn;
-	struct task_struct	*thread;
+	irq_handler_t		thread_fn; // 在独立的中断线程化中的处理函数
+	struct task_struct	*thread; // 使用中断线程化时，对应的线程
 	struct irqaction	*secondary;
-	unsigned int		irq;
+	unsigned int		irq; // 对应的IRQ号
 	unsigned int		flags;
 	unsigned long		thread_flags;
 	unsigned long		thread_mask;

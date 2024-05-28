@@ -5,6 +5,7 @@
 /* Interrupts/Exceptions */
 #include <asm/trapnr.h>
 
+/* C语言和汇编语言包含相同的头文件时，根据__ASSEMBLY__符号导入不同的内容 */
 #ifndef __ASSEMBLY__
 #include <linux/entry-common.h>
 #include <linux/hardirq.h>
