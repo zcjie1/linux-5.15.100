@@ -516,13 +516,13 @@ DECLARE_STATIC_KEY_FALSE(force_irqthreads_key);
 // 软中断类型
 enum
 {
-	HI_SOFTIRQ=0,
-	TIMER_SOFTIRQ,
-	NET_TX_SOFTIRQ,
-	NET_RX_SOFTIRQ,
+	HI_SOFTIRQ=0, /* 高优先级tasklet */
+	TIMER_SOFTIRQ, /* 定时器timer */
+	NET_TX_SOFTIRQ, /* 网卡发送数据 */
+	NET_RX_SOFTIRQ, /* 网卡接收数据 */
 	BLOCK_SOFTIRQ,
 	IRQ_POLL_SOFTIRQ,
-	TASKLET_SOFTIRQ, // 绑定CPU，不会并发执行
+	TASKLET_SOFTIRQ, /* 绑定CPU，不会并发执行*/
 	SCHED_SOFTIRQ,
 	HRTIMER_SOFTIRQ,
 	RCU_SOFTIRQ,    /* Preferable RCU should always be the last softirq */

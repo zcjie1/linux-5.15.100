@@ -195,20 +195,26 @@ EXPORT_SYMBOL(jiffies_64);
 # define BASE_DEF	0
 #endif
 
+/**
+ * 组织所有的time_list定时器
+ * 
+ * per_cpu变量。每个CPU拥有一个BASE_STD类型和BASE_DEF类型
+ * 分别为 <普通定时器> 和 <可延迟定时器>
+*/
 struct timer_base {
 	raw_spinlock_t		lock;
-	struct timer_list	*running_timer;
+	struct timer_list	*running_timer; // 当前正在运行的timer定时器
 #ifdef CONFIG_PREEMPT_RT
 	spinlock_t		expiry_lock;
 	atomic_t		timer_waiters;
 #endif
-	unsigned long		clk;
+	unsigned long		clk; // 此timer_base当前的时间，以jiffy为单位，用来判断包含的定时器是否已经到期或超时
 	unsigned long		next_expiry;
 	unsigned int		cpu;
 	bool			next_expiry_recalc;
 	bool			is_idle;
 	bool			timers_pending;
-	DECLARE_BITMAP(pending_map, WHEEL_SIZE);
+	DECLARE_BITMAP(pending_map, WHEEL_SIZE); // 用来标明vector某条链表是否为空
 	struct hlist_head	vectors[WHEEL_SIZE];
 } ____cacheline_aligned;
 

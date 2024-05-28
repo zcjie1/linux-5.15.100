@@ -8,14 +8,15 @@
 #include <linux/debugobjects.h>
 #include <linux/stringify.h>
 
+/*  */
 struct timer_list {
 	/*
 	 * All fields that change during normal runtime grouped to the
 	 * same cacheline
 	 */
-	struct hlist_node	entry;
-	unsigned long		expires;
-	void			(*function)(struct timer_list *);
+	struct hlist_node	entry; // 连接到timer_base
+	unsigned long		expires; // 到期时间(绝对时间，以jiffy为单位)
+	void			(*function)(struct timer_list *); // 到期时执行的操作
 	u32			flags;
 
 #ifdef CONFIG_LOCKDEP
