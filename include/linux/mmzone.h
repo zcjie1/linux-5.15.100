@@ -266,6 +266,7 @@ static __always_inline bool vmstat_item_in_bytes(int idx)
 #define LRU_ACTIVE 1
 #define LRU_FILE 2
 
+// LRU链表类型
 enum lru_list {
 	LRU_INACTIVE_ANON = LRU_BASE,
 	LRU_ACTIVE_ANON = LRU_BASE + LRU_ACTIVE,
@@ -909,6 +910,8 @@ typedef struct pglist_data {
 	 * NOTE: THIS IS UNUSED IF MEMCG IS ENABLED.
 	 *
 	 * Use mem_cgroup_lruvec() to look up lruvecs.
+	 * 
+	 * LRU链表
 	 */
 	struct lruvec		__lruvec;
 

@@ -333,7 +333,9 @@ struct kiocb {
 	/* The 'ki_filp' pointer is shared in a union for aio */
 	randomized_struct_fields_start
 
-	loff_t			ki_pos; // 文件读取位置偏移
+	// 文件读取位置偏移
+	loff_t			ki_pos;
+	
 	void (*ki_complete)(struct kiocb *iocb, long ret, long ret2); // IO完成回调
 	void			*private;
 	int			ki_flags; // IO类型，如 Direct IO 或 Buffered IO
@@ -1489,10 +1491,10 @@ struct sb_writers {
 struct super_block {
 	struct list_head	s_list;		/* Keep this first 用于在super_blocks互相连接*/
 	dev_t			s_dev;		/* search index; _not_ kdev_t */
-	unsigned char		s_blocksize_bits;
-	unsigned long		s_blocksize;
+	unsigned char		s_blocksize_bits; // 表示s_blocksize所需位数
+	unsigned long		s_blocksize; // 此文件系统中文件的最小块size
 	loff_t			s_maxbytes;	/* Max file size */
-	struct file_system_type	*s_type; // 文件系统类型
+	struct file_system_type	*s_type; // 文件系统类型(提供mount, init_fs_context等函数)
 	const struct super_operations	*s_op; // 文件系统操作函数
 	const struct dquot_operations	*dq_op;
 	const struct quotactl_ops	*s_qcop;
@@ -1500,7 +1502,7 @@ struct super_block {
 	unsigned long		s_flags;
 	unsigned long		s_iflags;	/* internal SB_I_* flags */
 	unsigned long		s_magic;
-	struct dentry		*s_root; // 根目录
+	struct dentry		*s_root; // 根目录(此文件系统的root文件)
 	struct rw_semaphore	s_umount;
 	int			s_count;
 	atomic_t		s_active;
@@ -1520,7 +1522,7 @@ struct super_block {
 	__u16 s_encoding_flags;
 #endif
 	struct hlist_bl_head	s_roots;	/* alternate root dentries for NFS */
-	struct list_head	s_mounts;	/* list of mounts; _not_ for fs use */
+	struct list_head	s_mounts;	/* list of mounts; _not_ for fs use 挂载此文件系统的mount对象列表 */
 	struct block_device	*s_bdev;
 	struct backing_dev_info *s_bdi;
 	struct mtd_info		*s_mtd;
@@ -1535,7 +1537,7 @@ struct super_block {
 	 * s_fsnotify_marks together for cache efficiency. They are frequently
 	 * accessed and rarely modified.
 	 */
-	void			*s_fs_info;	/* Filesystem private info */
+	void			*s_fs_info;	/* Filesystem private info 私有数据*/
 
 	/* Granularity of c/m/atime in ns (cannot be worse than a second) */
 	u32			s_time_gran;

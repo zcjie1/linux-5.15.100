@@ -579,6 +579,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		}
 	}
 
+	// Direct IO开始
 	inode_dio_begin(inode);
 
 	blk_start_plug(&plug);
