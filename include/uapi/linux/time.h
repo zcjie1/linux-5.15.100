@@ -30,6 +30,7 @@ struct itimerval {
 };
 #endif
 
+// 时区
 struct timezone {
 	int	tz_minuteswest;	/* minutes west of Greenwich */
 	int	tz_dsttime;	/* type of dst correction */

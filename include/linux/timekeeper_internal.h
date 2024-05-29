@@ -92,11 +92,11 @@ struct tk_read_base {
 struct timekeeper {
 	struct tk_read_base	tkr_mono;
 	struct tk_read_base	tkr_raw;
-	u64			xtime_sec;
+	u64			xtime_sec; // REALTIME(墙上时间)
 	unsigned long		ktime_sec;
-	struct timespec64	wall_to_monotonic;
-	ktime_t			offs_real;
-	ktime_t			offs_boot;
+	struct timespec64	wall_to_monotonic; // MONOTONIC时间-墙上时间，与offs_real互为相反数
+	ktime_t			offs_real; // MONOTONIC与REALTIME的差值
+	ktime_t			offs_boot; // MONOTONIC与BOOTTIME的差值
 	ktime_t			offs_tai;
 	s32			tai_offset;
 	unsigned int		clock_was_set_seq;

@@ -94,7 +94,7 @@ struct module;
  * structure.
  */
 struct clocksource {
-	u64			(*read)(struct clocksource *cs);
+	u64			(*read)(struct clocksource *cs); // 读取时钟源的当前时钟数
 	u64			mask;
 	u32			mult;
 	u32			shift;
@@ -107,7 +107,7 @@ struct clocksource {
 	u64			max_cycles;
 	const char		*name;
 	struct list_head	list;
-	int			rating;
+	int			rating; // 当前clocksource的等级
 	enum clocksource_ids	id;
 	enum vdso_clock_mode	vdso_clock_mode;
 	unsigned long		flags;

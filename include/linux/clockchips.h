@@ -69,6 +69,9 @@ enum clock_event_state {
 
 /**
  * struct clock_event_device - clock event device descriptor
+ * 
+ * 时钟中断设备
+ * 
  * @event_handler:	Assigned by the framework to be called by the low
  *			level handler of the event source
  * @set_next_event:	set next event function using a clocksource delta
@@ -98,8 +101,8 @@ enum clock_event_state {
  * @owner:		module reference
  */
 struct clock_event_device {
-	void			(*event_handler)(struct clock_event_device *);
-	int			(*set_next_event)(unsigned long evt, struct clock_event_device *);
+	void			(*event_handler)(struct clock_event_device *); // 时钟中断到来时的处理函数
+	int			(*set_next_event)(unsigned long evt, struct clock_event_device *); // 设置下一个时钟中断
 	int			(*set_next_ktime)(ktime_t expires, struct clock_event_device *);
 	ktime_t			next_event;
 	u64			max_delta_ns;
@@ -110,9 +113,11 @@ struct clock_event_device {
 	unsigned int		features;
 	unsigned long		retries;
 
-	int			(*set_state_periodic)(struct clock_event_device *);
-	int			(*set_state_oneshot)(struct clock_event_device *);
-	int			(*set_state_oneshot_stopped)(struct clock_event_device *);
+	/* 切换当前时钟中断设备的状态 */
+
+	int			(*set_state_periodic)(struct clock_event_device *); // 周期触发
+	int			(*set_state_oneshot)(struct clock_event_device *); // 单次触发
+	int			(*set_state_oneshot_stopped)(struct clock_event_device *); // 单次触发后停止
 	int			(*set_state_shutdown)(struct clock_event_device *);
 	int			(*tick_resume)(struct clock_event_device *);
 
@@ -123,7 +128,7 @@ struct clock_event_device {
 	unsigned long		max_delta_ticks;
 
 	const char		*name;
-	int			rating;
+	int			rating; // 设备的等级
 	int			irq;
 	int			bound_on;
 	const struct cpumask	*cpumask;

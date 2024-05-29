@@ -1093,6 +1093,8 @@ static void local_apic_timer_interrupt(void)
  *
  * [ if a single-CPU system runs an SMP kernel then we call the local
  *   interrupt as well. Thus we cannot inline the local irq ... ]
+ * 
+ * 时钟中断处理程序
  */
 DEFINE_IDTENTRY_SYSVEC(sysvec_apic_timer_interrupt)
 {

@@ -143,6 +143,7 @@ static const __initconst struct idt_data apic_idts[] = {
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
+	/* 时钟中断处理程序 */
 	INTG(LOCAL_TIMER_VECTOR,		asm_sysvec_apic_timer_interrupt),
 	INTG(X86_PLATFORM_IPI_VECTOR,		asm_sysvec_x86_platform_ipi),
 # ifdef CONFIG_HAVE_KVM

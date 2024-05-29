@@ -23,8 +23,8 @@ struct __kernel_itimerspec {
  */
 #ifndef __kernel_old_timeval
 struct __kernel_old_timeval {
-	__kernel_long_t tv_sec;
-	__kernel_long_t tv_usec;
+	__kernel_long_t tv_sec; // 从Epoch(1970-01-01 00:00:00 UTC)到现在的秒数
+	__kernel_long_t tv_usec; // 微秒
 };
 #endif
 
