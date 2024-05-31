@@ -4827,6 +4827,7 @@ no_journal:
 	 * so we can safely mount the rest of the filesystem now.
 	 */
 
+	// 获取根目录对应的inode节点
 	root = ext4_iget(sb, EXT4_ROOT_INO, EXT4_IGET_SPECIAL);
 	if (IS_ERR(root)) {
 		ext4_msg(sb, KERN_ERR, "get root inode failed");
@@ -4840,6 +4841,7 @@ no_journal:
 		goto failed_mount4;
 	}
 
+	// 由根目录inode节点生成对应的dentry结构
 	sb->s_root = d_make_root(root);
 	if (!sb->s_root) {
 		ext4_msg(sb, KERN_ERR, "get root dentry failed");
