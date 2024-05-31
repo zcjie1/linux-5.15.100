@@ -648,9 +648,9 @@ struct inode {
 	struct posix_acl	*i_default_acl;
 #endif
 
-	const struct inode_operations	*i_op; // 指向目录操作函数或文件操作函数
+	const struct inode_operations	*i_op; // 目录(元数据)操作函数或文件(元数据)操作函数
 	struct super_block	*i_sb; // 所属的文件系统super block
-	struct address_space	*i_mapping; // 指向文件的page cache
+	struct address_space	*i_mapping; // 文件的page cache
 
 #ifdef CONFIG_SECURITY
 	void			*i_security;
@@ -666,14 +666,14 @@ struct inode {
 	 *    inode_(inc|dec)_link_count
 	 */
 	union {
-		const unsigned int i_nlink;
+		const unsigned int i_nlink; // 文件的硬链接数
 		unsigned int __i_nlink;
 	};
 	dev_t			i_rdev; // 设备文件主从设备号
 	loff_t			i_size; // 文件所占大小
 	struct timespec64	i_atime; // access time
 	struct timespec64	i_mtime; // modify time(更改文件内容)
-	struct timespec64	i_ctime; // change time(更改文件本身)
+	struct timespec64	i_ctime; // change time(更改文件元数据)
 	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
 	unsigned short          i_bytes;
 	u8			i_blkbits;
@@ -691,7 +691,7 @@ struct inode {
 	unsigned long		dirtied_when;	/* jiffies of first dirtying */
 	unsigned long		dirtied_time_when;
 
-	struct hlist_node	i_hash;
+	struct hlist_node	i_hash; // 将inode链接到哈希链表inode_hashtable中
 	struct list_head	i_io_list;	/* backing dev IO list */
 #ifdef CONFIG_CGROUP_WRITEBACK
 	struct bdi_writeback	*i_wb;		/* the associated cgroup wb */
@@ -702,10 +702,10 @@ struct inode {
 	u16			i_wb_frn_history;
 #endif
 	struct list_head	i_lru;		/* inode LRU list 连接到super_block->s_inode_lru上*/
-	struct list_head	i_sb_list;
+	struct list_head	i_sb_list;  // 连接至super_block中
 	struct list_head	i_wb_list;	/* backing dev writeback list */
 	union {
-		struct hlist_head	i_dentry;
+		struct hlist_head	i_dentry; // 文件硬链接的dentry组成的链表
 		struct rcu_head		i_rcu;
 	};
 	atomic64_t		i_version;
@@ -717,7 +717,7 @@ struct inode {
 	atomic_t		i_readcount; /* struct files open RO */
 #endif
 	union {
-		const struct file_operations	*i_fop;	/* 文件操作函数集合 former ->i_op->default_file_ops */
+		const struct file_operations	*i_fop;	/* 文件内容操作函数集合 former ->i_op->default_file_ops */
 		void (*free_inode)(struct inode *);
 	};
 	struct file_lock_context	*i_flctx;
@@ -728,7 +728,7 @@ struct inode {
 
 		struct cdev		*i_cdev; // 指向所对应的字符设备
 
-		char			*i_link;
+		char			*i_link; // 软链接的目标文件的路径
 		unsigned		i_dir_seq;
 	};
 
@@ -986,7 +986,7 @@ struct file {
 		struct llist_node	fu_llist;
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
-	struct path		f_path;
+	struct path		f_path; // 文件路径，包含挂载点和目录项
 	struct inode		*f_inode;	/* cached value 每个文件对应一个inode结构体*/
 	const struct file_operations	*f_op; // 文件(目录)相关操作
 
@@ -996,11 +996,11 @@ struct file {
 	 */
 	spinlock_t		f_lock;
 	enum rw_hint		f_write_hint; // 写入寿命暗示
-	atomic_long_t		f_count;
+	atomic_long_t		f_count; // 引用计数
 	unsigned int 		f_flags; // 文件标志位，open系统调用中设置
-	fmode_t			f_mode; // 文件类型
+	fmode_t			f_mode; // 文件模式(可读，可写等)
 	struct mutex		f_pos_lock;
-	loff_t			f_pos;
+	loff_t			f_pos; // 文件读写当前位置
 	struct fown_struct	f_owner;
 	const struct cred	*f_cred;
 	struct file_ra_state	f_ra; // 文件页预读信息
@@ -1016,7 +1016,7 @@ struct file {
 	/* Used by fs/eventpoll.c to link all the hooks to this file */
 	struct hlist_head	*f_ep; // 挂载epitem
 #endif /* #ifdef CONFIG_EPOLL */
-	struct address_space	*f_mapping;
+	struct address_space	*f_mapping; // page cache
 	errseq_t		f_wb_err;
 	errseq_t		f_sb_err; /* for syncfs */
 } __randomize_layout
@@ -1502,7 +1502,7 @@ struct super_block {
 	unsigned long		s_flags;
 	unsigned long		s_iflags;	/* internal SB_I_* flags */
 	unsigned long		s_magic;
-	struct dentry		*s_root; // 根目录(此文件系统的root文件)
+	struct dentry		*s_root; // 根目录(此文件系统的root目录)
 	struct rw_semaphore	s_umount;
 	int			s_count;
 	atomic_t		s_active;

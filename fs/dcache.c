@@ -98,6 +98,7 @@ EXPORT_SYMBOL(dotdot_name);
 
 static unsigned int d_hash_shift __read_mostly;
 
+// dentry哈希管理结构(内核全局)
 static struct hlist_bl_head *dentry_hashtable __read_mostly;
 
 static inline struct hlist_bl_head *d_hash(unsigned int hash)

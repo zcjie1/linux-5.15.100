@@ -4,16 +4,33 @@
 
 #include <linux/types.h>
 
+/* inode文件类型 */
+
 #if defined(__KERNEL__) || !defined(__GLIBC__) || (__GLIBC__ < 2)
 
 #define S_IFMT  00170000
+
+// socket文件
 #define S_IFSOCK 0140000
+
+// 软链接文件
 #define S_IFLNK	 0120000
+
+// 普通(regular)文件
 #define S_IFREG  0100000
+
+// 块设备文件
 #define S_IFBLK  0060000
+
+// 目录文件
 #define S_IFDIR  0040000
+
+// 字符设备文件
 #define S_IFCHR  0020000
+
+// FIFO(管道)文件
 #define S_IFIFO  0010000
+
 #define S_ISUID  0004000
 #define S_ISGID  0002000
 #define S_ISVTX  0001000

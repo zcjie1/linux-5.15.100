@@ -64,7 +64,7 @@ static struct file_system_type **find_filesystem(const char *name, unsigned len)
 /**
  *	register_filesystem - register a new filesystem
  *  
- *  注册新的文件系统(将相应描述符到file_systems链表上)
+ *  注册文件系统(将相应描述符到file_systems链表上)
  *  
  *	@fs: the file system structure
  *

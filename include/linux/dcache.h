@@ -88,36 +88,41 @@ extern struct dentry_stat_t dentry_stat;
 
 #define d_lock	d_lockref.lock
 
-// 目录结构体
+// 目录项结构体
 struct dentry {
 	/* RCU lookup touched fields */
 	unsigned int d_flags;		/* protected by d_lock */
 	seqcount_spinlock_t d_seq;	/* per dentry seqlock */
-	struct hlist_bl_node d_hash;	/* lookup hash list */
-	struct dentry *d_parent;	/* parent directory */
-	struct qstr d_name;
-	struct inode *d_inode;		/* Where the name belongs to - NULL is
+	struct hlist_bl_node d_hash;	/* 链接到dentry_hashtable链表 lookup hash list */
+	struct dentry *d_parent;	/* 父目录 parent directory */
+	struct qstr d_name;			/* 目录项名字，名字长度及哈希值 */
+	struct inode *d_inode;		/* 所属inode Where the name belongs to - NULL is
 					 * negative */
-	unsigned char d_iname[DNAME_INLINE_LEN];	/* small names */
+	
+	/**
+	 * 长度足够时，存储文件的名字
+	 * 长度不足时，动态分配内存，并将地址赋给d_name->name字段
+	*/
+	unsigned char d_iname[DNAME_INLINE_LEN];
 
 	/* Ref lookup also touches following */
 	struct lockref d_lockref;	/* per-dentry lock and refcount */
 	const struct dentry_operations *d_op; // 目录操作函数(赋值为特定文件系统的函数)
 	struct super_block *d_sb;	/* The root of the dentry tree */
 	unsigned long d_time;		/* used by d_revalidate */
-	void *d_fsdata;			/* fs-specific data */
+	void *d_fsdata;			/* fs-specific data 文件系统系统私有数据 */
 
 	union {
 		struct list_head d_lru;		/* LRU list 连接到super_block->s_dentry_lru上*/
 		wait_queue_head_t *d_wait;	/* in-lookup ones only */
 	};
-	struct list_head d_child;	/* child of parent list */
-	struct list_head d_subdirs;	/* our children */
+	struct list_head d_child;	/* 兄弟目录组成的链表 child of parent list */
+	struct list_head d_subdirs;	/* 子目录组成的链表 our children */
 	/*
 	 * d_alias and d_rcu can share memory
 	 */
 	union {
-		struct hlist_node d_alias;	/* inode alias list */
+		struct hlist_node d_alias;	/* 将dentry接入inode的硬链接链表 inode alias list */
 		struct hlist_bl_node d_in_lookup_hash;	/* only for in-lookup ones */
 	 	struct rcu_head d_rcu;
 	} d_u;
