@@ -10,7 +10,6 @@
 #
 # Normal rules (sorted alphabetically)
 #
-debug/
 .*
 *.a
 *.asn1.[ch]
