@@ -124,6 +124,7 @@
 
 #define EMBEDDED_NAME_MAX	(PATH_MAX - offsetof(struct filename, iname))
 
+// 构造filename
 struct filename *
 getname_flags(const char __user *filename, int flags, int *empty)
 {
@@ -135,6 +136,7 @@ getname_flags(const char __user *filename, int flags, int *empty)
 	if (result)
 		return result;
 
+	// 分配内存
 	result = __getname();
 	if (unlikely(!result))
 		return ERR_PTR(-ENOMEM);
@@ -146,6 +148,7 @@ getname_flags(const char __user *filename, int flags, int *empty)
 	kname = (char *)result->iname;
 	result->name = kname;
 
+	// 复制filename字符串
 	len = strncpy_from_user(kname, filename, EMBEDDED_NAME_MAX);
 	if (unlikely(len < 0)) {
 		__putname(result);
@@ -186,7 +189,9 @@ getname_flags(const char __user *filename, int flags, int *empty)
 		}
 	}
 
+	// 引用计数初始化
 	result->refcnt = 1;
+
 	/* The empty path is special. */
 	if (unlikely(!len)) {
 		if (empty)
@@ -561,9 +566,9 @@ EXPORT_SYMBOL(path_put);
 
 #define EMBEDDED_LEVELS 2
 struct nameidata {
-	struct path	path;
+	struct path	path; // 当前所在路径
 	struct qstr	last;
-	struct path	root;
+	struct path	root; // 所处文件系统的root
 	struct inode	*inode; /* path.dentry.d_inode */
 	unsigned int	flags, state;
 	unsigned	seq, m_seq, r_seq;
@@ -606,7 +611,9 @@ static inline void set_nameidata(struct nameidata *p, int dfd, struct filename *
 			  const struct path *root)
 {
 	__set_nameidata(p, dfd, name);
+
 	p->state = 0;
+
 	if (unlikely(root)) {
 		p->state = ND_ROOT_PRESET;
 		p->root = *root;
@@ -2474,9 +2481,12 @@ int filename_lookup(int dfd, struct filename *name, unsigned flags,
 {
 	int retval;
 	struct nameidata nd;
+
 	if (IS_ERR(name))
 		return PTR_ERR(name);
+	
 	set_nameidata(&nd, dfd, name, root);
+
 	retval = path_lookupat(&nd, flags | LOOKUP_RCU, path);
 	if (unlikely(retval == -ECHILD))
 		retval = path_lookupat(&nd, flags, path);
@@ -2849,7 +2859,9 @@ int path_pts(struct path *path)
 int user_path_at_empty(int dfd, const char __user *name, unsigned flags,
 		 struct path *path, int *empty)
 {
+	// 构造filename结构体
 	struct filename *filename = getname_flags(name, flags, empty);
+
 	int ret = filename_lookup(dfd, filename, flags, path, NULL);
 
 	putname(filename);

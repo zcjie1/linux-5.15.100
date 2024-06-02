@@ -305,7 +305,7 @@ struct file_system_type *get_fs_type(const char *name)
 	}
 
 	if (dot && fs && !(fs->fs_flags & FS_HAS_SUBTYPE)) {
-		put_filesystem(fs); // 减少模块的引用计数
+		put_filesystem(fs); // 减少文件系统的引用计数
 		fs = NULL;
 	}
 	return fs;

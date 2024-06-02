@@ -29,18 +29,26 @@ static inline long do_strnlen_user(const char __user *src, unsigned long count, 
 	/*
 	 * Do everything aligned. But that means that we
 	 * need to also expand the maximum..
+	 * 
+	 * 保证src地址8字节对齐
 	 */
 	align = (sizeof(unsigned long) - 1) & (unsigned long)src;
 	src -= align;
 	max += align;
 
+	// 读取src地址处的第一个unsigned long数据，并赋值给c
 	unsafe_get_user(c, (unsigned long __user *)src, efault);
+
+	// 将align的低位字节全部置位
 	c |= aligned_byte_mask(align);
 
 	for (;;) {
 		unsigned long data;
+		// 若c中包含全0字节(data标记c中的全0字节)
 		if (has_zero(c, &data, &constants)) {
 			data = prep_zero_mask(c, data, &constants);
+
+			// 转换mask
 			data = create_zero_mask(data);
 			return res + find_zero(data) + 1 - align;
 		}
@@ -96,8 +104,12 @@ long strnlen_user(const char __user *str, long count)
 	if (unlikely(count <= 0))
 		return 0;
 
+	// 获取TASK_SIZE，用户空间和内核空间的分界线
 	max_addr = user_addr_max();
+
+	// 获取用户空间字符串首地址
 	src_addr = (unsigned long)untagged_addr(str);
+
 	if (likely(src_addr < max_addr)) {
 		unsigned long max = max_addr - src_addr;
 		long retval;
@@ -105,6 +117,8 @@ long strnlen_user(const char __user *str, long count)
 		/*
 		 * Truncate 'max' to the user-specified limit, so that
 		 * we only have one limit we need to check in the loop
+		 * 
+		 * 边界限制
 		 */
 		if (max > count)
 			max = count;

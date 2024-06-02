@@ -43,7 +43,7 @@ static inline long count_masked_bytes(long mask)
 
 #endif
 
-/* Return nonzero if it has a zero */
+/* Return nonzero if it has a zero——若某个字节为0，返回非0值，bits标记为非0字节*/
 static inline unsigned long has_zero(unsigned long a, unsigned long *bits, const struct word_at_a_time *c)
 {
 	unsigned long mask = ((a - c->one_bits) & ~a) & c->high_bits;
@@ -56,6 +56,8 @@ static inline unsigned long prep_zero_mask(unsigned long a, unsigned long bits, 
 	return bits;
 }
 
+// bits格式为0x8000800080... 其中80字节为原数据全0字节
+// 经过转换后，第一个0 bit所在字节即为原数据的全0字节
 static inline unsigned long create_zero_mask(unsigned long bits)
 {
 	bits = (bits - 1) & ~bits;
@@ -65,6 +67,7 @@ static inline unsigned long create_zero_mask(unsigned long bits)
 /* The mask we created is directly usable as a bytemask */
 #define zero_bytemask(mask) (mask)
 
+// 返回第一个0bit所在字节，从0开始计数
 static inline unsigned long find_zero(unsigned long mask)
 {
 	return count_masked_bytes(mask);

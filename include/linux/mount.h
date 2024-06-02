@@ -68,11 +68,12 @@ struct fs_context;
 #define MNT_UMOUNT		0x8000000
 #define MNT_CURSOR		0x10000000
 
+// 挂载对象信息
 struct vfsmount {
 	struct dentry *mnt_root;	/* root of the mounted tree */
 	struct super_block *mnt_sb;	/* pointer to superblock */
 	int mnt_flags;
-	struct user_namespace *mnt_userns;
+	struct user_namespace *mnt_userns; // 用户命名空间
 } __randomize_layout;
 
 static inline struct user_namespace *mnt_user_ns(const struct vfsmount *mnt)

@@ -51,6 +51,7 @@ extern int path_pts(struct path *path);
 
 extern int user_path_at_empty(int, const char __user *, unsigned, struct path *, int *empty);
 
+// 根据dir_name找到目标目录，通过path返回
 static inline int user_path_at(int dfd, const char __user *name, unsigned flags,
 		 struct path *path)
 {

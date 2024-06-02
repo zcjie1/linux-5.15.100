@@ -5,6 +5,7 @@
 struct dentry;
 struct vfsmount;
 
+// 挂载对象信息和挂载目录
 struct path {
 	struct vfsmount *mnt;
 	struct dentry *dentry;

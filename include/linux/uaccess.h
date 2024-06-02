@@ -406,7 +406,10 @@ static inline void user_access_restore(unsigned long flags) { }
 #define user_write_access_end user_access_end
 #endif
 #ifndef user_read_access_begin
+/* 禁用SMAP，使得内核可以访问用户数据*/
 #define user_read_access_begin user_access_begin
+
+/* 使能SMAP，禁止内核访问用户数据*/
 #define user_read_access_end user_access_end
 #endif
 

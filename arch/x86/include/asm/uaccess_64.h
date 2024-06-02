@@ -46,6 +46,7 @@ copy_user_generic(void *to, const void *from, unsigned len)
 	return ret;
 }
 
+// 返回未拷贝的字节数
 static __always_inline __must_check unsigned long
 raw_copy_from_user(void *dst, const void __user *src, unsigned long size)
 {

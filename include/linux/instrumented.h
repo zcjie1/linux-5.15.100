@@ -122,7 +122,9 @@ instrument_copy_to_user(void __user *to, const void *from, unsigned long n)
 }
 
 /**
- * instrument_copy_from_user - instrument writes of copy_from_user kcsan内存检查
+ * instrument_copy_from_user - instrument writes of copy_from_user 
+ * 
+ * kcsan内存检查
  *
  * Instrument writes to kernel memory, that are due to copy_from_user (and
  * variants). The instrumentation should be inserted before the accesses.

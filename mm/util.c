@@ -170,6 +170,7 @@ void *memdup_user(const void __user *src, size_t len)
 {
 	void *p;
 
+	// 分配slab
 	p = kmalloc_track_caller(len, GFP_USER | __GFP_NOWARN);
 	if (!p)
 		return ERR_PTR(-ENOMEM);
@@ -221,6 +222,7 @@ char *strndup_user(const char __user *s, long n)
 	char *p;
 	long length;
 
+	// 获取用户空间字符串长度
 	length = strnlen_user(s, n);
 
 	if (!length)
@@ -229,6 +231,7 @@ char *strndup_user(const char __user *s, long n)
 	if (length > n)
 		return ERR_PTR(-EINVAL);
 
+	// 从用户空间复制字符串
 	p = memdup_user(s, length);
 
 	if (IS_ERR(p))

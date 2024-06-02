@@ -38,6 +38,7 @@
 
 #ifdef CONFIG_X86_SMAP
 
+// 开启SMAP
 static __always_inline void clac(void)
 {
 	/* Note: a barrier is implicit in alternative() */

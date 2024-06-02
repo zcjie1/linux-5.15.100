@@ -563,7 +563,9 @@ extern struct movsl_mask {
 # include <asm/uaccess_64.h>
 #endif
 
-/*
+/* access_ok检查 + 短暂禁止SMAP
+ * SMAP禁止内核访问用户数据
+ * 
  * The "unsafe" user accesses aren't really "unsafe", but the naming
  * is a big fat warning: you have to not only do the access_ok()
  * checking before using them, but you have to surround them with the

@@ -63,7 +63,8 @@ enum ucount_type {
 
 #define MAX_PER_NAMESPACE_UCOUNTS UCOUNT_RLIMIT_NPROC
 
-// 关系图链接——https://img-blog.csdnimg.cn/20210324202952996.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3B3bDk5OQ==,size_16,color_FFFFFF,t_70#pic_center
+// 关系图链接
+//https://blog.csdn.net/pwl999/article/details/115186689
 struct user_namespace {
 	struct uid_gid_map	uid_map;
 	struct uid_gid_map	gid_map;

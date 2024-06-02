@@ -92,9 +92,10 @@
  * faccessat would be undefined behavior and thus treating it equivalent to
  * AT_EACCESS is valid undefined behavior.
  */
-#define AT_FDCWD		-100    /* Special value used to indicate
-                                           openat should use the current
-                                           working directory. */
+
+// Special value used to indicate openat should use the Current Working Directory.
+#define AT_FDCWD		-100    
+
 #define AT_SYMLINK_NOFOLLOW	0x100   /* Do not follow symbolic links.  */
 #define AT_EACCESS		0x200	/* Test access permitted for
                                            effective IDs, not real IDs.  */

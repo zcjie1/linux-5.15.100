@@ -31,19 +31,19 @@ struct mnt_pcp {
 
 struct mountpoint {
 	struct hlist_node m_hash;
-	struct dentry *m_dentry;
+	struct dentry *m_dentry; // 挂载目录
 	struct hlist_head m_list;
-	int m_count;
+	int m_count; // 挂载次数
 };
 
 struct mount {
 	struct hlist_node mnt_hash;
-	struct mount *mnt_parent;
-	struct dentry *mnt_mountpoint;
-	struct vfsmount mnt;
+	struct mount *mnt_parent; // 父mount
+	struct dentry *mnt_mountpoint; // 挂载点
+	struct vfsmount mnt; // 挂载对象
 	union {
 		struct rcu_head mnt_rcu;
-		struct llist_node mnt_llist;
+		struct llist_node mnt_llist; // 链接到super_block的s_mounts链表
 	};
 #ifdef CONFIG_SMP
 	struct mnt_pcp __percpu *mnt_pcp;

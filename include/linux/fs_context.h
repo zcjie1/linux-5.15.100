@@ -124,6 +124,7 @@ struct fs_context_operations {
 /*
  * fs_context manipulation functions.
  */
+
 extern struct fs_context *fs_context_for_mount(struct file_system_type *fs_type,
 						unsigned int sb_flags);
 extern struct fs_context *fs_context_for_reconfigure(struct dentry *dentry,

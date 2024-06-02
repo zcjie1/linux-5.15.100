@@ -68,7 +68,10 @@ static u64 event;
 static DEFINE_IDA(mnt_id_ida);
 static DEFINE_IDA(mnt_group_ida);
 
+// mount哈希全局管理结构
 static struct hlist_head *mount_hashtable __read_mostly;
+
+// mountpoint哈希全局管理结构
 static struct hlist_head *mountpoint_hashtable __read_mostly;
 static struct kmem_cache *mnt_cache __read_mostly;
 static DECLARE_RWSEM(namespace_sem);
@@ -2929,12 +2932,14 @@ static int do_new_mount_fc(struct fs_context *fc, struct path *mountpoint,
 
 	up_write(&sb->s_umount);
 
+	// 构造mount结构体
 	mnt = vfs_create_mount(fc);
 	if (IS_ERR(mnt))
 		return PTR_ERR(mnt);
 
 	mnt_warn_timestamp_expiry(mountpoint, mnt);
 
+	// 获取挂载点
 	mp = lock_mount(mountpoint);
 	if (IS_ERR(mp)) {
 		mntput(mnt);
@@ -2952,7 +2957,7 @@ static int do_new_mount_fc(struct fs_context *fc, struct path *mountpoint,
  * namespace's tree
  */
 static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
-			int mnt_flags, const char *name, void *data)
+			int mnt_flags, const char *dev_name, void *data)
 {
 	struct file_system_type *type;
 	struct fs_context *fc;
@@ -2962,6 +2967,7 @@ static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 	if (!fstype)
 		return -EINVAL;
 
+	// 通过name查找文件系统类型
 	type = get_fs_type(fstype);
 	if (!type)
 		return -ENODEV;
@@ -2977,6 +2983,7 @@ static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 		}
 	}
 
+	// 初始化fs_context
 	fc = fs_context_for_mount(type, sb_flags);
 	put_filesystem(type);
 	if (IS_ERR(fc))
@@ -2985,14 +2992,20 @@ static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 	if (subtype)
 		err = vfs_parse_fs_string(fc, "subtype",
 					  subtype, strlen(subtype));
-	if (!err && name)
-		err = vfs_parse_fs_string(fc, "source", name, strlen(name));
+	
+	if (!err && dev_name)
+		err = vfs_parse_fs_string(fc, "source", dev_name, strlen(dev_name));
+	
 	if (!err)
 		err = parse_monolithic_mount_data(fc, data);
+	
 	if (!err && !mount_capable(fc))
 		err = -EPERM;
+	
+	// 获取文件系统root dentry
 	if (!err)
 		err = vfs_get_tree(fc);
+	
 	if (!err)
 		err = do_new_mount_fc(fc, path, mnt_flags);
 
@@ -3228,6 +3241,7 @@ static void *copy_mount_options(const void __user * data)
 	return copy;
 }
 
+// 复制用户空间字符串
 static char *copy_mount_string(const void __user *data)
 {
 	return data ? strndup_user(data, PATH_MAX) : NULL;
@@ -3267,8 +3281,11 @@ int path_mount(const char *dev_name, struct path *path,
 	ret = security_sb_mount(dev_name, path, type_page, flags, data_page);
 	if (ret)
 		return ret;
+	
+	// 判断当前进程是否有管理员权限
 	if (!may_mount())
 		return -EPERM;
+	
 	if (flags & SB_MANDLOCK)
 		warn_mandlock();
 
@@ -3322,6 +3339,7 @@ int path_mount(const char *dev_name, struct path *path,
 	if (flags & MS_MOVE)
 		return do_move_mount_old(path, dev_name);
 
+	// 普通挂载
 	return do_new_mount(path, type_page, sb_flags, mnt_flags, dev_name,
 			    data_page);
 }
@@ -3332,9 +3350,12 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 	struct path path;
 	int ret;
 
+	// 根据dir_name找到目标目录，通过path返回
 	ret = user_path_at(AT_FDCWD, dir_name, LOOKUP_FOLLOW, &path);
 	if (ret)
 		return ret;
+	
+	// 挂载
 	ret = path_mount(dev_name, &path, type_page, flags, data_page);
 	path_put(&path);
 	return ret;
@@ -3520,6 +3541,13 @@ struct dentry *mount_subtree(struct vfsmount *m, const char *name)
 }
 EXPORT_SYMBOL(mount_subtree);
 
+/**
+ * mount系统调用
+ * 
+ * 例如:
+ * mount("sysfs", "/sys", "sysfs", 0, NULL);
+ * mount("/dev/sda1", "a", "ext4", 0, NULL);
+*/
 SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
 		char __user *, type, unsigned long, flags, void __user *, data)
 {
@@ -3528,21 +3556,25 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
 	char *kernel_dev;
 	void *options;
 
+	// 复制文件系统类型名
 	kernel_type = copy_mount_string(type);
 	ret = PTR_ERR(kernel_type);
 	if (IS_ERR(kernel_type))
 		goto out_type;
 
+	// 复制设备名
 	kernel_dev = copy_mount_string(dev_name);
 	ret = PTR_ERR(kernel_dev);
 	if (IS_ERR(kernel_dev))
 		goto out_dev;
 
+	// 复制data数据
 	options = copy_mount_options(data);
 	ret = PTR_ERR(options);
 	if (IS_ERR(options))
 		goto out_data;
 
+	// 挂载
 	ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
 
 	kfree(options);
