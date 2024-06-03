@@ -31,10 +31,11 @@ struct kernfs_fs_context;
 struct kernfs_open_node;
 struct kernfs_iattrs;
 
+// kernfs_node类型
 enum kernfs_node_type {
-	KERNFS_DIR		= 0x0001,
-	KERNFS_FILE		= 0x0002,
-	KERNFS_LINK		= 0x0004,
+	KERNFS_DIR		= 0x0001, // 目录文件
+	KERNFS_FILE		= 0x0002, // 普通文件
+	KERNFS_LINK		= 0x0004, // 符号链接文件
 };
 
 #define KERNFS_TYPE_MASK		0x000f
@@ -89,16 +90,20 @@ enum kernfs_root_flag {
 
 /* type-specific structures for kernfs_node union members */
 struct kernfs_elem_dir {
-	unsigned long		subdirs;
+	unsigned long		subdirs; // 子目录数量
+
+
 	/* children rbtree starts here and goes through kn->rb */
-	struct rb_root		children;
+
+	struct rb_root		children; // 子kernfs_node组成的红黑树
 
 	/*
 	 * The kernfs hierarchy this directory belongs to.  This fits
 	 * better directly in kernfs_node but is here to save space.
 	 */
 	struct kernfs_root	*root;
-	/*
+	
+	/* 修改计数
 	 * Monotonic revision counter, used to identify if a directory
 	 * node has changed during negative dentry revalidation.
 	 */
@@ -140,7 +145,7 @@ struct kernfs_node {
 	struct kernfs_node	*parent;
 	const char		*name;
 
-	struct rb_node		rb;
+	struct rb_node		rb; // 红黑树节点
 
 	const void		*ns;	/* namespace tag */
 	unsigned int		hash;	/* ns + name hash */
@@ -150,6 +155,9 @@ struct kernfs_node {
 		struct kernfs_elem_attr		attr;
 	};
 
+	/**
+	 * 在sysfs中，指向对应的kobject
+	*/
 	void			*priv;
 
 	/*
@@ -160,7 +168,7 @@ struct kernfs_node {
 
 	unsigned short		flags;
 	umode_t			mode;
-	struct kernfs_iattrs	*iattr;
+	struct kernfs_iattrs	*iattr; // kernfs_node属性
 };
 
 /*
@@ -184,13 +192,14 @@ struct kernfs_syscall_ops {
 
 struct kernfs_root {
 	/* published fields */
-	struct kernfs_node	*kn;
+
+	struct kernfs_node	*kn; // 指向root的首个node节点
 	unsigned int		flags;	/* KERNFS_ROOT_* flags */
 
 	/* private fields, do not use outside kernfs proper */
 	struct idr		ino_idr;
 	u32			last_id_lowbits;
-	u32			id_highbits;
+	u32			id_highbits; // 0代表64位，1代表32位
 	struct kernfs_syscall_ops *syscall_ops;
 
 	/* list of kernfs_super_info of this root, protected by kernfs_rwsem */

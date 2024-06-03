@@ -342,6 +342,7 @@ static int kernfs_sd_compare(const struct kernfs_node *left,
 
 /**
  *	kernfs_link_sibling - link kernfs_node into sibling rbtree
+ *  将kn加入父节点管理的子节点红黑树中
  *	@kn: kernfs_node of interest
  *
  *	Link @kn into its sibling rbtree which starts from
@@ -375,11 +376,13 @@ static int kernfs_link_sibling(struct kernfs_node *kn)
 
 	/* add new node and rebalance the tree */
 	rb_link_node(&kn->rb, parent, node);
-	rb_insert_color(&kn->rb, &kn->parent->dir.children);
+	rb_insert_color(&kn->rb, &kn->parent->dir.children); // 调整红黑树
 
 	/* successfully added, account subdir number */
 	if (kernfs_type(kn) == KERNFS_DIR)
-		kn->parent->dir.subdirs++;
+		kn->parent->dir.subdirs++; // 增加子目录数
+	
+	// 增加修改计数
 	kernfs_inc_rev(kn->parent);
 
 	return 0;
@@ -576,6 +579,7 @@ struct kernfs_node *kernfs_node_from_dentry(struct dentry *dentry)
 	return NULL;
 }
 
+// 分配kernfs_node
 static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
 					     struct kernfs_node *parent,
 					     const char *name, umode_t mode,
@@ -590,11 +594,14 @@ static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
 	if (!name)
 		return NULL;
 
+	// 分配kernfs_node内存
 	kn = kmem_cache_zalloc(kernfs_node_cache, GFP_KERNEL);
 	if (!kn)
 		goto err_out1;
 
+	// 为idr_alloc预分配内存
 	idr_preload(GFP_KERNEL);
+
 	spin_lock(&kernfs_idr_lock);
 	ret = idr_alloc_cyclic(&root->ino_idr, kn, 1, 0, GFP_ATOMIC);
 	if (ret >= 0 && ret < root->last_id_lowbits)
@@ -652,10 +659,14 @@ struct kernfs_node *kernfs_new_node(struct kernfs_node *parent,
 {
 	struct kernfs_node *kn;
 
+	// 分配kernfs_node
 	kn = __kernfs_new_node(kernfs_root(parent), parent,
 			       name, mode, uid, gid, flags);
 	if (kn) {
+		// 增加父节点引用计数
 		kernfs_get(parent);
+
+		// 设置当前节点的父节点
 		kn->parent = parent;
 	}
 	return kn;
@@ -732,24 +743,29 @@ int kernfs_add_one(struct kernfs_node *kn)
 
 	down_write(&kernfs_rwsem);
 
-	ret = -EINVAL;
-	has_ns = kernfs_ns_enabled(parent);
-	if (WARN(has_ns != (bool)kn->ns, KERN_WARNING "kernfs: ns %s in '%s' for '%s'\n",
-		 has_ns ? "required" : "invalid", parent->name, kn->name))
-		goto out_unlock;
+	/* 错误、意外情况处理 */
+	{
+		ret = -EINVAL;
+		has_ns = kernfs_ns_enabled(parent);
+		if (WARN(has_ns != (bool)kn->ns, KERN_WARNING "kernfs: ns %s in '%s' for '%s'\n",
+			has_ns ? "required" : "invalid", parent->name, kn->name))
+			goto out_unlock;
 
-	if (kernfs_type(parent) != KERNFS_DIR)
-		goto out_unlock;
+		if (kernfs_type(parent) != KERNFS_DIR)
+			goto out_unlock;
 
-	ret = -ENOENT;
-	if (parent->flags & KERNFS_EMPTY_DIR)
-		goto out_unlock;
+		ret = -ENOENT;
+		if (parent->flags & KERNFS_EMPTY_DIR)
+			goto out_unlock;
 
-	if ((parent->flags & KERNFS_ACTIVATED) && !kernfs_active(parent))
-		goto out_unlock;
-
+		if ((parent->flags & KERNFS_ACTIVATED) && !kernfs_active(parent))
+			goto out_unlock;
+	}
+ 	
+	// 计算name和ns的哈希值
 	kn->hash = kernfs_name_hash(kn->name, kn->ns);
 
+	// 将kn加入父节点管理的子节点红黑树中
 	ret = kernfs_link_sibling(kn);
 	if (ret)
 		goto out_unlock;
@@ -757,8 +773,8 @@ int kernfs_add_one(struct kernfs_node *kn)
 	/* Update timestamps on the parent */
 	ps_iattr = parent->iattr;
 	if (ps_iattr) {
-		ktime_get_real_ts64(&ps_iattr->ia_ctime);
-		ps_iattr->ia_mtime = ps_iattr->ia_ctime;
+		ktime_get_real_ts64(&ps_iattr->ia_ctime); // 更新ia_ctime(change time)
+		ps_iattr->ia_mtime = ps_iattr->ia_ctime; // 更新ia_mtime(modify time)
 	}
 
 	up_write(&kernfs_rwsem);
@@ -914,11 +930,15 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 	struct kernfs_root *root;
 	struct kernfs_node *kn;
 
+	// 分配kernfs_root内存
 	root = kzalloc(sizeof(*root), GFP_KERNEL);
 	if (!root)
 		return ERR_PTR(-ENOMEM);
 
+	// 初始化IDR分配结构
 	idr_init(&root->ino_idr);
+
+	// 初始化kernfs_super_info链表头
 	INIT_LIST_HEAD(&root->supers);
 
 	/*
@@ -932,6 +952,7 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 	else
 		root->id_highbits = 1;
 
+	// 创建root的第一个kernfs_node
 	kn = __kernfs_new_node(root, NULL, "", S_IFDIR | S_IRUGO | S_IXUGO,
 			       GLOBAL_ROOT_UID, GLOBAL_ROOT_GID,
 			       KERNFS_DIR);
@@ -949,6 +970,7 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 	root->kn = kn;
 	init_waitqueue_head(&root->deactivate_waitq);
 
+	// 激活kn节点
 	if (!(root->flags & KERNFS_ROOT_CREATE_DEACTIVATED))
 		kernfs_activate(kn);
 
@@ -987,12 +1009,13 @@ struct kernfs_node *kernfs_create_dir_ns(struct kernfs_node *parent,
 	struct kernfs_node *kn;
 	int rc;
 
-	/* allocate */
+	/* allocate 分配kernfs_node，并设置parent */
 	kn = kernfs_new_node(parent, name, mode | S_IFDIR,
 			     uid, gid, KERNFS_DIR);
 	if (!kn)
 		return ERR_PTR(-ENOMEM);
 
+	// kn初始化
 	kn->dir.root = parent->dir.root;
 	kn->ns = ns;
 	kn->priv = priv;

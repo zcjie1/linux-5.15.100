@@ -63,17 +63,17 @@ enum kobject_action {
 
 struct kobject {
 	const char		*name; // 对象的文本名称，可通过sd导出至用户空间
-	struct list_head	entry;
-	struct kobject		*parent;
+	struct list_head	entry; // 连接当前所在kset中的其他kobject
+	struct kobject		*parent; // 父kobject(详情见kobject_add函数注释)
 	struct kset		*kset; // 标明所属的kobject集合
 	struct kobj_type	*ktype; // 更多有关kobject的信息，如释放结构体的析构函数
 	struct kernfs_node	*sd; /* sysfs directory entry */
-	struct kref		kref; // 引用计数
+	struct kref		kref; // 引用计数(初始化为1)
 #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
 	struct delayed_work	release;
 #endif
-	unsigned int state_initialized:1;
-	unsigned int state_in_sysfs:1;
+	unsigned int state_initialized:1; // 当前kobject是否初始化
+	unsigned int state_in_sysfs:1; // 当前kobject是否处在sysfs管理中
 	unsigned int state_add_uevent_sent:1;
 	unsigned int state_remove_uevent_sent:1;
 	unsigned int uevent_suppress:1;
@@ -136,8 +136,8 @@ static inline bool kobject_has_children(struct kobject *kobj)
 }
 
 struct kobj_type {
-	void (*release)(struct kobject *kobj);
-	const struct sysfs_ops *sysfs_ops;
+	void (*release)(struct kobject *kobj); // 释放kobject
+	const struct sysfs_ops *sysfs_ops; // 比如kobj_sysfs_ops
 	struct attribute **default_attrs;	/* use default_groups instead */
 	const struct attribute_group **default_groups;
 	const struct kobj_ns_type_operations *(*child_ns_type)(struct kobject *kobj);

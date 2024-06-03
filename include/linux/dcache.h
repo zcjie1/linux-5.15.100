@@ -46,6 +46,7 @@ struct vfsmount;
  * dentry.
  */
 struct qstr {
+	// len在高32位，hash在低32位
 	union {
 		struct {
 			HASH_LEN_DECLARE;

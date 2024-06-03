@@ -30,7 +30,7 @@
 #define LIST_BL_BUG_ON(x)
 #endif
 
-
+// bl = bit lock
 struct hlist_bl_head {
 	struct hlist_bl_node *first;
 };

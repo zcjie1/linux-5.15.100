@@ -5,10 +5,18 @@
 struct dentry;
 struct vfsmount;
 
-// 挂载对象信息和挂载目录
+/**
+ * 当前文件系统挂载信息 和 欲挂载新文件系统的目录
+ * 
+ * 用于通过dir_name查找对应的挂载点
+ * 
+ * 比如对于ext4文件系统下的test文件夹
+ * mnt就对应ext4的挂载信息
+ * dentry就对应test文件夹
+*/
 struct path {
-	struct vfsmount *mnt;
-	struct dentry *dentry;
+	struct vfsmount *mnt; // 挂载信息
+	struct dentry *dentry; // path对应的目录项
 } __randomize_layout;
 
 extern void path_get(const struct path *);

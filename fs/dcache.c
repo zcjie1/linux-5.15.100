@@ -3251,23 +3251,40 @@ void __init vfs_caches_init_early(void)
 {
 	int i;
 
+	// 初始化in_lookup_hashtable
 	for (i = 0; i < ARRAY_SIZE(in_lookup_hashtable); i++)
 		INIT_HLIST_BL_HEAD(&in_lookup_hashtable[i]);
 
+	// 创建dentry哈希表
 	dcache_init_early();
+
+	// 创建inode哈希表
 	inode_init_early();
 }
 
 void __init vfs_caches_init(void)
 {
+	// 创建slab内存池，用于__getname()函数
 	names_cachep = kmem_cache_create_usercopy("names_cache", PATH_MAX, 0,
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC, 0, PATH_MAX, NULL);
 
+	// 定义dentry_cache slab内存池和dentry哈希表
 	dcache_init();
+
+	// 定义inode_cache slab内存池和inode哈希表
 	inode_init();
+
+	// 定义file_cache slab内存池，并初始化nr_files的per_cpu变量
 	files_init();
+
+	// 初始化系统可打开的最大文件数量
 	files_maxfiles_init();
+
 	mnt_init();
+
+	// 块设备初始化
 	bdev_cache_init();
+
+	// 字符设备初始化
 	chrdev_init();
 }

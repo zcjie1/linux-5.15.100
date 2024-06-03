@@ -961,7 +961,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	 */
 	boot_cpu_init();
 	page_address_init();
-	pr_notice("I am linux_banner: %s", linux_banner);
+	pr_notice("Linux_Banner: %s", linux_banner);
 	early_security_init();
 	setup_arch(&command_line);
 	setup_boot_config();
@@ -1133,7 +1133,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	security_init();
 	dbg_late_init();
 	net_ns_init();
-	vfs_caches_init();
+	vfs_caches_init(); // VFS初始化
 	pagecache_init();
 	signals_init();
 	seq_file_init();

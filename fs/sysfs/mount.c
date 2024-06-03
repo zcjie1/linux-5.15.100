@@ -91,13 +91,15 @@ static struct file_system_type sysfs_fs_type = {
 	.name			= "sysfs",
 	.init_fs_context	= sysfs_init_fs_context,
 	.kill_sb		= sysfs_kill_sb,
-	.fs_flags		= FS_USERNS_MOUNT,
+	.fs_flags		= FS_USERNS_MOUNT, // 不可被用户空间挂载
 };
 
+// sysfs初始化
 int __init sysfs_init(void)
 {
 	int err;
 
+	// 初始化sysfs对应的kernfs_root
 	sysfs_root = kernfs_create_root(NULL, KERNFS_ROOT_EXTRA_OPEN_PERM_CHECK,
 					NULL);
 	if (IS_ERR(sysfs_root))
@@ -105,6 +107,7 @@ int __init sysfs_init(void)
 
 	sysfs_root_kn = sysfs_root->kn;
 
+	// 注册sysfs文件系统
 	err = register_filesystem(&sysfs_fs_type);
 	if (err) {
 		kernfs_destroy_root(sysfs_root);

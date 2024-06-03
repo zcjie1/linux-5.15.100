@@ -34,7 +34,7 @@ enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT};
 #define LOOKUP_EXCL		0x0400	/* ... in exclusive creation */
 #define LOOKUP_RENAME_TARGET	0x0800	/* ... in destination of rename() */
 
-/* internal use only */
+/* internal use only 查找中间路径 */
 #define LOOKUP_PARENT		0x0010
 
 /* Scoping flags for lookup. */

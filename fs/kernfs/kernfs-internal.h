@@ -88,6 +88,7 @@ static inline void kernfs_set_rev(struct kernfs_node *parent,
 	dentry->d_time = parent->dir.rev;
 }
 
+// 修改次数计数
 static inline void kernfs_inc_rev(struct kernfs_node *parent)
 {
 	parent->dir.rev++;

@@ -80,16 +80,19 @@ static int populate_dir(struct kobject *kobj)
 	return error;
 }
 
+// 在sysfs中创建目录
 static int create_dir(struct kobject *kobj)
 {
 	const struct kobj_type *ktype = get_ktype(kobj);
 	const struct kobj_ns_type_operations *ops;
 	int error;
 
+	// 创建sysfs目录节点(kernfs_node)
 	error = sysfs_create_dir_ns(kobj, kobject_namespace(kobj));
 	if (error)
 		return error;
 
+	// 初始化目录节点
 	error = populate_dir(kobj);
 	if (error) {
 		sysfs_remove_dir(kobj);
@@ -107,6 +110,8 @@ static int create_dir(struct kobject *kobj)
 	/*
 	 * @kobj->sd may be deleted by an ancestor going away.  Hold an
 	 * extra reference so that it stays until @kobj is gone.
+	 * 
+	 * 增加kobject对应kernfs_node的引用计数
 	 */
 	sysfs_get(kobj->sd);
 
@@ -217,23 +222,32 @@ static void kobj_kset_leave(struct kobject *kobj)
 	kset_put(kobj->kset);
 }
 
+// kobject初始化核心函数
 static void kobject_init_internal(struct kobject *kobj)
 {
 	if (!kobj)
 		return;
+	
+	// 引用计数初始化为1
 	kref_init(&kobj->kref);
+
 	INIT_LIST_HEAD(&kobj->entry);
+
+	/* 初始化kobject所处状态 */
+
 	kobj->state_in_sysfs = 0;
 	kobj->state_add_uevent_sent = 0;
 	kobj->state_remove_uevent_sent = 0;
 	kobj->state_initialized = 1;
 }
 
-
+// kobject_add核心函数
 static int kobject_add_internal(struct kobject *kobj)
 {
 	int error = 0;
 	struct kobject *parent;
+
+	/* 错误处理 */
 
 	if (!kobj)
 		return -ENOENT;
@@ -245,6 +259,7 @@ static int kobject_add_internal(struct kobject *kobj)
 		return -EINVAL;
 	}
 
+	// 若kobj的父kobject存在，增加kobject的引用计数
 	parent = kobject_get(kobj->parent);
 
 	/* join kset if set, use it as parent if we do not already have one */
@@ -260,6 +275,7 @@ static int kobject_add_internal(struct kobject *kobj)
 		 parent ? kobject_name(parent) : "<NULL>",
 		 kobj->kset ? kobject_name(&kobj->kset->kobj) : "<NULL>");
 
+	// 在sysfs中创建目录
 	error = create_dir(kobj);
 	if (error) {
 		kobj_kset_leave(kobj);
@@ -358,14 +374,18 @@ void kobject_init(struct kobject *kobj, struct kobj_type *ktype)
 {
 	char *err_str;
 
+	/* 错误处理 */
+
 	if (!kobj) {
 		err_str = "invalid kobject pointer!";
 		goto error;
 	}
+
 	if (!ktype) {
 		err_str = "must have a ktype to be initialized properly!\n";
 		goto error;
 	}
+
 	if (kobj->state_initialized) {
 		/* do not error out as sometimes we can recover */
 		pr_err("kobject (%p): tried to init an initialized object, something is seriously wrong.\n",
@@ -373,6 +393,7 @@ void kobject_init(struct kobject *kobj, struct kobj_type *ktype)
 		dump_stack();
 	}
 
+	// kobject初始化核心函数
 	kobject_init_internal(kobj);
 	kobj->ktype = ktype;
 	return;
@@ -389,12 +410,17 @@ static __printf(3, 0) int kobject_add_varg(struct kobject *kobj,
 {
 	int retval;
 
+	// 设置kobject名字
 	retval = kobject_set_name_vargs(kobj, fmt, vargs);
 	if (retval) {
 		pr_err("kobject: can not set name properly!\n");
 		return retval;
 	}
+
+	// 设置父object
 	kobj->parent = parent;
+
+	// kobject_add核心函数
 	return kobject_add_internal(kobj);
 }
 
@@ -406,7 +432,8 @@ static __printf(3, 0) int kobject_add_varg(struct kobject *kobj,
  *
  * The kobject name is set and added to the kobject hierarchy in this
  * function.
- *
+ * 
+ *                          parents设置
  * If @parent is set, then the parent of the @kobj will be set to it.
  * If @parent is NULL, then the parent of the @kobj will be set to the
  * kobject associated with the kset assigned to this kobject.  If no kset
@@ -440,12 +467,14 @@ int kobject_add(struct kobject *kobj, struct kobject *parent,
 	if (!kobj)
 		return -EINVAL;
 
+	// 若kobject未被初始化
 	if (!kobj->state_initialized) {
 		pr_err("kobject '%s' (%p): tried to add an uninitialized object, something is seriously wrong.\n",
 		       kobject_name(kobj), kobj);
 		dump_stack();
 		return -EINVAL;
 	}
+
 	va_start(args, fmt);
 	retval = kobject_add_varg(kobj, parent, fmt, args);
 	va_end(args);
@@ -655,6 +684,7 @@ EXPORT_SYMBOL(kobject_del);
 
 /**
  * kobject_get() - Increment refcount for object.
+ * 
  * @kobj: object.
  */
 struct kobject *kobject_get(struct kobject *kobj)
@@ -776,6 +806,8 @@ static struct kobj_type dynamic_kobj_ktype = {
 
 /**
  * kobject_create() - Create a struct kobject dynamically.
+ * 
+ * 创建kobject
  *
  * This function creates a kobject structure dynamically and sets it up
  * to be a "dynamic" kobject with a default release function set up.
@@ -789,10 +821,12 @@ struct kobject *kobject_create(void)
 {
 	struct kobject *kobj;
 
+	// 分配kobject内存
 	kobj = kzalloc(sizeof(*kobj), GFP_KERNEL);
 	if (!kobj)
 		return NULL;
 
+	// 初始化kobject
 	kobject_init(kobj, &dynamic_kobj_ktype);
 	return kobj;
 }
@@ -815,10 +849,12 @@ struct kobject *kobject_create_and_add(const char *name, struct kobject *parent)
 	struct kobject *kobj;
 	int retval;
 
+	// 创建kobject
 	kobj = kobject_create();
 	if (!kobj)
 		return NULL;
 
+	// 将kobject加入sysfs中
 	retval = kobject_add(kobj, parent, "%s", name);
 	if (retval) {
 		pr_warn("%s: kobject_add error: %d\n", __func__, retval);

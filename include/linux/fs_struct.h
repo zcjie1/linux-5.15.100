@@ -6,13 +6,14 @@
 #include <linux/spinlock.h>
 #include <linux/seqlock.h>
 
+// 保存进程的根目录和当前工作目录
 struct fs_struct {
 	int users;
 	spinlock_t lock;
 	seqcount_spinlock_t seq;
 	int umask;
 	int in_exec;
-	struct path root, pwd;
+	struct path root, pwd; // 当前进程的根目录和当前目录
 } __randomize_layout;
 
 extern struct kmem_cache *fs_cachep;

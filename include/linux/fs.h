@@ -2707,7 +2707,7 @@ struct audit_names;
 struct filename {
 	const char		*name;	/* pointer to actual string */
 	const __user char	*uptr;	/* original userland pointer */
-	int			refcnt;
+	int			refcnt; // 引用计数初始化为1
 	struct audit_names	*aname;
 	const char		iname[];
 };

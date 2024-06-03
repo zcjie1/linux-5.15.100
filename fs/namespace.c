@@ -73,7 +73,10 @@ static struct hlist_head *mount_hashtable __read_mostly;
 
 // mountpoint哈希全局管理结构
 static struct hlist_head *mountpoint_hashtable __read_mostly;
+
+// struct mount结构体的slab cache池
 static struct kmem_cache *mnt_cache __read_mostly;
+
 static DECLARE_RWSEM(namespace_sem);
 static HLIST_HEAD(unmounted);	/* protected by namespace_sem */
 static LIST_HEAD(ex_mountpoints); /* protected by namespace_sem */
@@ -4370,14 +4373,18 @@ void __init mnt_init(void)
 {
 	int err;
 
+	// 初始化struct mount结构体内存池
 	mnt_cache = kmem_cache_create("mnt_cache", sizeof(struct mount),
 			0, SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_ACCOUNT, NULL);
 
+	// 初始化struct mount哈希表
 	mount_hashtable = alloc_large_system_hash("Mount-cache",
 				sizeof(struct hlist_head),
 				mhash_entries, 19,
 				HASH_ZERO,
 				&m_hash_shift, &m_hash_mask, 0, 0);
+	
+	// 初始化struct mountpoint哈希表
 	mountpoint_hashtable = alloc_large_system_hash("Mountpoint-cache",
 				sizeof(struct hlist_head),
 				mphash_entries, 19,
@@ -4387,15 +4394,20 @@ void __init mnt_init(void)
 	if (!mount_hashtable || !mountpoint_hashtable)
 		panic("Failed to allocate mount hash table\n");
 
+	// 初始化kernfs_node_cache和kernfs_iattrs_cache内存池
 	kernfs_init();
 
+	// sysfs初始化
 	err = sysfs_init();
 	if (err)
 		printk(KERN_WARNING "%s: sysfs_init error: %d\n",
 			__func__, err);
+	
+	// 创建fs kobject并加入到sysfs中
 	fs_kobj = kobject_create_and_add("fs", NULL);
 	if (!fs_kobj)
 		printk(KERN_WARNING "%s: kobj create error\n", __func__);
+	
 	shmem_init();
 	init_rootfs();
 	init_mount_tree();

@@ -9142,7 +9142,8 @@ static unsigned long __init arch_reserved_kernel_pages(void)
 #define ADAPT_SCALE_NPAGES	(ADAPT_SCALE_BASE >> PAGE_SHIFT)
 #endif
 
-/*
+/* 根据机器物理内存的大小灵活地分配散列表的存储空间
+ * 
  * allocate a large system hash table from bootmem
  * - it is assumed that the hash table must contain an exact power-of-2
  *   quantity of entries

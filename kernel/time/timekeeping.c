@@ -791,6 +791,9 @@ static void timekeeping_forward_now(struct timekeeper *tk)
 
 /**
  * ktime_get_real_ts64 - Returns the time of day in a timespec64.
+ * 
+ * 更新ts指针指向的时间
+ * 
  * @ts:		pointer to the timespec to be set
  *
  * Returns the time of day in a timespec64 (WARN if suspended).
