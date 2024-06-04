@@ -76,7 +76,6 @@ static struct file_system_type **find_filesystem(const char *name, unsigned len)
  *	structures and must not be freed until the file system has been
  *	unregistered.
  */
- 
 int register_filesystem(struct file_system_type * fs)
 {
 	int res = 0;

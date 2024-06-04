@@ -38,9 +38,9 @@ struct mountpoint {
 
 struct mount {
 	struct hlist_node mnt_hash;
-	struct mount *mnt_parent; // 父mount
-	struct dentry *mnt_mountpoint; // 挂载点
-	struct vfsmount mnt; // 挂载对象
+	struct mount *mnt_parent; // 父mount(初始化为自身)
+	struct dentry *mnt_mountpoint; // 挂载点(初始值与mnt->mnt_root相等)
+	struct vfsmount mnt; // 挂载的对象
 	union {
 		struct rcu_head mnt_rcu;
 		struct llist_node mnt_llist; // 链接到super_block的s_mounts链表

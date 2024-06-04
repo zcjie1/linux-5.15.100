@@ -3346,6 +3346,7 @@ static int shmem_encode_fh(struct inode *inode, __u32 *fh, int *len,
 	return 1;
 }
 
+// tmpfs导出
 static const struct export_operations shmem_export_ops = {
 	.get_parent     = shmem_get_parent,
 	.encode_fh      = shmem_encode_fh,
@@ -3654,6 +3655,7 @@ static void shmem_put_super(struct super_block *sb)
 	sb->s_fs_info = NULL;
 }
 
+// 初始化super_block
 static int shmem_fill_super(struct super_block *sb, struct fs_context *fc)
 {
 	struct shmem_options *ctx = fc->fs_private;
@@ -3666,7 +3668,7 @@ static int shmem_fill_super(struct super_block *sb, struct fs_context *fc)
 	if (!sbinfo)
 		return -ENOMEM;
 
-	sb->s_fs_info = sbinfo;
+	sb->s_fs_info = sbinfo; // 设置tmpfs sb的私有数据
 
 #ifdef CONFIG_TMPFS
 	/*
@@ -3724,12 +3726,13 @@ static int shmem_fill_super(struct super_block *sb, struct fs_context *fc)
 #endif
 	uuid_gen(&sb->s_uuid);
 
+	// 分配sb中的首个inode
 	inode = shmem_get_inode(sb, NULL, S_IFDIR | sbinfo->mode, 0, VM_NORESERVE);
 	if (!inode)
 		goto failed;
 	inode->i_uid = sbinfo->uid;
 	inode->i_gid = sbinfo->gid;
-	sb->s_root = d_make_root(inode);
+	sb->s_root = d_make_root(inode); // 将首个inode对应的dentry作为root
 	if (!sb->s_root)
 		goto failed;
 	return 0;
@@ -3754,6 +3757,7 @@ static void shmem_free_fc(struct fs_context *fc)
 	}
 }
 
+// tmpfs fx_context相关操作
 static const struct fs_context_operations shmem_fs_context_ops = {
 	.free			= shmem_free_fc,
 	.get_tree		= shmem_get_tree,
@@ -3788,12 +3792,14 @@ static void shmem_destroy_inode(struct inode *inode)
 		mpol_free_shared_policy(&SHMEM_I(inode)->policy);
 }
 
+// 分配struct shmem_inode_info
 static void shmem_init_inode(void *foo)
 {
 	struct shmem_inode_info *info = foo;
 	inode_init_once(&info->vfs_inode);
 }
 
+// 创建struct shmem_inode_info内存池
 static void shmem_init_inodecache(void)
 {
 	shmem_inode_cachep = kmem_cache_create("shmem_inode_cache",
@@ -3908,6 +3914,7 @@ static const struct vm_operations_struct shmem_vm_ops = {
 #endif
 };
 
+// tmpfs初始化fs_context
 int shmem_init_fs_context(struct fs_context *fc)
 {
 	struct shmem_options *ctx;
@@ -3925,6 +3932,7 @@ int shmem_init_fs_context(struct fs_context *fc)
 	return 0;
 }
 
+// tmpfs文件系统类型
 static struct file_system_type shmem_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "tmpfs",
@@ -3936,18 +3944,22 @@ static struct file_system_type shmem_fs_type = {
 	.fs_flags	= FS_USERNS_MOUNT | FS_THP_SUPPORT,
 };
 
+// tmpfs初始化
 int __init shmem_init(void)
 {
 	int error;
 
+	// 创建struct shmem_inode_info内存池
 	shmem_init_inodecache();
 
+	// 注册tmpfs文件系统类型
 	error = register_filesystem(&shmem_fs_type);
 	if (error) {
 		pr_err("Could not register tmpfs\n");
 		goto out2;
 	}
 
+	// kernel内部挂载tmpfs(创建对应的super_block和mount结构体，但未加入mount树中)
 	shm_mnt = kern_mount(&shmem_fs_type);
 	if (IS_ERR(shm_mnt)) {
 		error = PTR_ERR(shm_mnt);

@@ -721,7 +721,7 @@ struct inode {
 		void (*free_inode)(struct inode *);
 	};
 	struct file_lock_context	*i_flctx;
-	struct address_space	i_data;
+	struct address_space	i_data; // page cache，反向映射等信息
 	struct list_head	i_devices;
 	union {
 		struct pipe_inode_info	*i_pipe;
@@ -1505,7 +1505,7 @@ struct super_block {
 	struct dentry		*s_root; // 根目录(此文件系统的root目录)
 	struct rw_semaphore	s_umount;
 	int			s_count;
-	atomic_t		s_active;
+	atomic_t		s_active; // 挂载次数
 #ifdef CONFIG_SECURITY
 	void                    *s_security;
 #endif
@@ -1536,6 +1536,8 @@ struct super_block {
 	 * Keep s_fs_info, s_time_gran, s_fsnotify_mask, and
 	 * s_fsnotify_marks together for cache efficiency. They are frequently
 	 * accessed and rarely modified.
+	 * 
+	 * tmpfs中指向shmem_sb_info
 	 */
 	void			*s_fs_info;	/* Filesystem private info 私有数据*/
 

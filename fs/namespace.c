@@ -962,6 +962,7 @@ static struct mount *skip_mnt_tree(struct mount *p)
 
 /**
  * vfs_create_mount - Create a mount for a configured superblock
+ * 创建mount结构体，但是并不进行任何attach操作
  * @fc: The configuration context with the superblock attached
  *
  * Create a mount to an already configured superblock.  If necessary, the
@@ -977,6 +978,7 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
 	if (!fc->root)
 		return ERR_PTR(-EINVAL);
 
+	// 分配mount结构体并初始化
 	mnt = alloc_vfsmnt(fc->source ?: "none");
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
@@ -984,13 +986,15 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
 	if (fc->sb_flags & SB_KERNMOUNT)
 		mnt->mnt.mnt_flags = MNT_INTERNAL;
 
-	atomic_inc(&fc->root->d_sb->s_active);
+	atomic_inc(&fc->root->d_sb->s_active); // 挂载次数计数
 	mnt->mnt.mnt_sb		= fc->root->d_sb;
 	mnt->mnt.mnt_root	= dget(fc->root);
 	mnt->mnt_mountpoint	= mnt->mnt.mnt_root;
 	mnt->mnt_parent		= mnt;
 
 	fs_userns = mnt->mnt.mnt_sb->s_user_ns;
+
+	// 若用户命名空间不为init_user_ns
 	if (!initial_idmapping(fs_userns))
 		mnt->mnt.mnt_userns = get_user_ns(fs_userns);
 
@@ -1001,12 +1005,13 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
 }
 EXPORT_SYMBOL(vfs_create_mount);
 
+// 内部挂载文件系统实例(super_block)，创建对应的super_block和mount结构体
 struct vfsmount *fc_mount(struct fs_context *fc)
 {
-	int err = vfs_get_tree(fc);
+	int err = vfs_get_tree(fc); // 分配superblock, 赋值fc->root(sb根目录)
 	if (!err) {
 		up_write(&fc->root->d_sb->s_umount);
-		return vfs_create_mount(fc);
+		return vfs_create_mount(fc); // 创建对应的mount结构体
 	}
 	return ERR_PTR(err);
 }
@@ -1028,13 +1033,15 @@ struct vfsmount *vfs_kern_mount(struct file_system_type *type,
 	if (IS_ERR(fc))
 		return ERR_CAST(fc);
 
+	// 参数解析
 	if (name)
 		ret = vfs_parse_fs_string(fc, "source",
 					  name, strlen(name));
 	if (!ret)
 		ret = parse_monolithic_mount_data(fc, data);
+	
 	if (!ret)
-		mnt = fc_mount(fc);
+		mnt = fc_mount(fc); // 内部挂载
 	else
 		mnt = ERR_PTR(ret);
 
@@ -4408,7 +4415,9 @@ void __init mnt_init(void)
 	if (!fs_kobj)
 		printk(KERN_WARNING "%s: kobj create error\n", __func__);
 	
+	// tmpfs初始化
 	shmem_init();
+
 	init_rootfs();
 	init_mount_tree();
 }
@@ -4421,6 +4430,7 @@ void put_mnt_ns(struct mnt_namespace *ns)
 	free_mnt_ns(ns);
 }
 
+// kernel内部挂载文件系统
 struct vfsmount *kern_mount(struct file_system_type *type)
 {
 	struct vfsmount *mnt;
@@ -4430,7 +4440,7 @@ struct vfsmount *kern_mount(struct file_system_type *type)
 		 * it is a longterm mount, don't release mnt until
 		 * we unmount before file sys is unregistered
 		*/
-		real_mount(mnt)->mnt_ns = MNT_NS_INTERNAL;
+		real_mount(mnt)->mnt_ns = MNT_NS_INTERNAL; // 挂载命名空间设置为无效
 	}
 	return mnt;
 }

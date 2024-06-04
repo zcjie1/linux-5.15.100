@@ -3280,6 +3280,7 @@ void __init vfs_caches_init(void)
 	// 初始化系统可打开的最大文件数量
 	files_maxfiles_init();
 
+	// 文件系统初始化(sysfs, tmpfs, rootfs)
 	mnt_init();
 
 	// 块设备初始化

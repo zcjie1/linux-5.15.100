@@ -91,7 +91,7 @@ static struct file_system_type sysfs_fs_type = {
 	.name			= "sysfs",
 	.init_fs_context	= sysfs_init_fs_context,
 	.kill_sb		= sysfs_kill_sb,
-	.fs_flags		= FS_USERNS_MOUNT, // 不可被用户空间挂载
+	.fs_flags		= FS_USERNS_MOUNT,
 };
 
 // sysfs初始化

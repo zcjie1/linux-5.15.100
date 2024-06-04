@@ -62,6 +62,7 @@ static int vfs_parse_sb_flag(struct fs_context *fc, const char *key)
 {
 	unsigned int token;
 
+	// 查询常量表，设置相关super_block标志位
 	token = lookup_constant(common_set_sb_flag, key, 0);
 	if (token) {
 		fc->sb_flags |= token;
@@ -69,6 +70,7 @@ static int vfs_parse_sb_flag(struct fs_context *fc, const char *key)
 		return 0;
 	}
 
+	// 查询常量表，清除相关super_block标志位
 	token = lookup_constant(common_clear_sb_flag, key, 0);
 	if (token) {
 		fc->sb_flags &= ~token;
@@ -131,6 +133,7 @@ int vfs_parse_fs_param(struct fs_context *fc, struct fs_parameter *param)
 	if (!param->key)
 		return invalf(fc, "Unnamed parameter\n");
 
+	// 设置super_block标志位
 	ret = vfs_parse_sb_flag(fc, param->key);
 	if (ret != -ENOPARAM)
 		return ret;
@@ -168,12 +171,14 @@ int vfs_parse_fs_string(struct fs_context *fc, const char *key,
 {
 	int ret;
 
+	// 构造初始配置参数
 	struct fs_parameter param = {
 		.key	= key,
 		.type	= fs_value_is_flag,
 		.size	= v_size,
 	};
 
+	// 将value转换为带'/0'截止符的字符串
 	if (value) {
 		param.string = kmemdup_nul(value, v_size, GFP_KERNEL);
 		if (!param.string)
@@ -181,6 +186,7 @@ int vfs_parse_fs_string(struct fs_context *fc, const char *key,
 		param.type = fs_value_is_string;
 	}
 
+	// 解析参数，设置相关标志位
 	ret = vfs_parse_fs_param(fc, &param);
 	kfree(param.string);
 	return ret;
@@ -254,10 +260,12 @@ static struct fs_context *alloc_fs_context(struct file_system_type *fs_type,
 	struct fs_context *fc;
 	int ret = -ENOMEM;
 
+	// 分配fs_context内存
 	fc = kzalloc(sizeof(struct fs_context), GFP_KERNEL_ACCOUNT);
 	if (!fc)
 		return ERR_PTR(-ENOMEM);
 
+	// 初始化fs_context
 	fc->purpose	= purpose;
 	fc->sb_flags	= sb_flags;
 	fc->sb_flags_mask = sb_flags_mask;
@@ -270,7 +278,7 @@ static struct fs_context *alloc_fs_context(struct file_system_type *fs_type,
 
 	switch (purpose) {
 	case FS_CONTEXT_FOR_MOUNT:
-		fc->user_ns = get_user_ns(fc->cred->user_ns);
+		fc->user_ns = get_user_ns(fc->cred->user_ns); // 设置用户命名空间
 		break;
 	case FS_CONTEXT_FOR_SUBMOUNT:
 		fc->user_ns = get_user_ns(reference->d_sb->s_user_ns);
@@ -647,6 +655,8 @@ const struct fs_context_operations legacy_fs_context_ops = {
 /*
  * Initialise a legacy context for a filesystem that doesn't support
  * fs_context.
+ * 
+ * 默认init_fs_context函数
  */
 static int legacy_init_fs_context(struct fs_context *fc)
 {

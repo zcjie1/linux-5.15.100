@@ -78,7 +78,7 @@ struct p_log {
 	struct fc_log *log;
 };
 
-/*
+/* 文件系统上下文(多用于创建super_block)
  * Filesystem context for holding the parameters used in the creation or
  * reconfiguration of a superblock.
  *
@@ -90,7 +90,7 @@ struct p_log {
 struct fs_context {
 	const struct fs_context_operations *ops;
 	struct mutex		uapi_mutex;	/* Userspace access mutex */
-	struct file_system_type	*fs_type;
+	struct file_system_type	*fs_type; // 文件系统类型
 	void			*fs_private;	/* The filesystem's context */
 	void			*sget_key;
 	struct dentry		*root;		/* The root and superblock */

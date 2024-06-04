@@ -54,6 +54,7 @@ struct fs_context;
 			    MNT_DOOMED | MNT_SYNC_UMOUNT | MNT_MARKED | \
 			    MNT_CURSOR)
 
+// 对应SB_KERNMOUNT
 #define MNT_INTERNAL	0x4000
 
 #define MNT_LOCK_ATIME		0x040000

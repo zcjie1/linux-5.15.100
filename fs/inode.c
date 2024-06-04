@@ -391,6 +391,8 @@ EXPORT_SYMBOL(address_space_init_once);
  * These are initializations that only need to be done
  * once, because the fields are idempotent across use
  * of the inode, so let the slab aware of that.
+ * 
+ * inode初始化
  */
 void inode_init_once(struct inode *inode)
 {

@@ -530,7 +530,7 @@ retry:
 	}
 	if (!s) {
 		spin_unlock(&sb_lock);
-		s = alloc_super(fc->fs_type, fc->sb_flags, user_ns);
+		s = alloc_super(fc->fs_type, fc->sb_flags, user_ns); // 分配super_block
 		if (!s)
 			return ERR_PTR(-ENOMEM);
 		goto retry;
@@ -1134,7 +1134,7 @@ int vfs_get_super(struct fs_context *fc,
 		BUG();
 	}
 
-	sb = sget_fc(fc, test, set_anon_super_fc);
+	sb = sget_fc(fc, test, set_anon_super_fc); // 分配super_block
 	if (IS_ERR(sb))
 		return PTR_ERR(sb);
 
@@ -1479,7 +1479,8 @@ struct dentry *mount_single(struct file_system_type *fs_type,
 EXPORT_SYMBOL(mount_single);
 
 /**
- * vfs_get_tree - Get the mountable root
+ * vfs_get_tree - Get the mountable root(fc->root)
+ * 若super_block不存在，分配一个
  * @fc: The superblock configuration context.
  *
  * The filesystem is invoked to get or create a superblock which can then later
@@ -1497,7 +1498,7 @@ int vfs_get_tree(struct fs_context *fc)
 	/* Get the mountable root in fc->root, with a ref on the root and a ref
 	 * on the superblock.
 	 */
-	error = fc->ops->get_tree(fc);
+	error = fc->ops->get_tree(fc); // 分配super_block，更新fc->root
 	if (error < 0)
 		return error;
 
@@ -1510,7 +1511,7 @@ int vfs_get_tree(struct fs_context *fc)
 		BUG();
 	}
 
-	sb = fc->root->d_sb;
+	sb = fc->root->d_sb; // 获取fc对应的superblcok
 	WARN_ON(!sb->s_bdi);
 
 	/*
