@@ -739,6 +739,7 @@ static void unix_show_fdinfo(struct seq_file *m, struct socket *sock)
 #define unix_show_fdinfo NULL
 #endif
 
+// UDS协议操作函数
 static const struct proto_ops unix_stream_ops = {
 	.family =	PF_UNIX,
 	.owner =	THIS_MODULE,
@@ -1318,6 +1319,7 @@ static long unix_wait_for_peer(struct sock *other, long timeo)
 	return timeo;
 }
 
+// UDS连接函数
 static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 			       int addr_len, int flags)
 {
@@ -1349,7 +1351,7 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	   we will have to recheck all again in any case.
 	 */
 
-	/* create new sock for complete connection */
+	/* create new sock for complete connection 与服务端通信的中介sock */
 	newsk = unix_create1(sock_net(sk), NULL, 0, sock->type);
 	if (IS_ERR(newsk)) {
 		err = PTR_ERR(newsk);
@@ -1359,13 +1361,13 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	err = -ENOMEM;
 
-	/* Allocate skb for sending to listening sock */
+	/* Allocate skb for sending to listening sock 为中介sock分配skb */
 	skb = sock_wmalloc(newsk, 1, 0, GFP_KERNEL);
 	if (skb == NULL)
 		goto out;
 
 restart:
-	/*  Find listening sock. */
+	/*  Find listening sock. 服务器端sock */
 	other = unix_find_other(net, sunaddr, addr_len, sk->sk_type, hash, &err);
 	if (!other)
 		goto out;
@@ -1386,6 +1388,7 @@ restart:
 	if (other->sk_shutdown & RCV_SHUTDOWN)
 		goto out_unlock;
 
+	// 若服务端接收队列已满
 	if (unix_recvq_full(other)) {
 		err = -EAGAIN;
 		if (!timeo)
@@ -1444,7 +1447,7 @@ restart:
 	/* The way is open! Fastly set all the necessary fields... */
 
 	sock_hold(sk);
-	unix_peer(newsk)	= sk;
+	unix_peer(newsk)	= sk; // 建立客户端sock与中介sock的联系
 	newsk->sk_state		= TCP_ESTABLISHED;
 	newsk->sk_type		= sk->sk_type;
 	init_peercred(newsk);
@@ -1490,7 +1493,7 @@ restart:
 
 	/* take ten and send info to listening sock */
 	spin_lock(&other->sk_receive_queue.lock);
-	__skb_queue_tail(&other->sk_receive_queue, skb);
+	__skb_queue_tail(&other->sk_receive_queue, skb); // 将中介sock的skb放入服务器端sock的等待队列中
 	spin_unlock(&other->sk_receive_queue.lock);
 	unix_state_unlock(other);
 	other->sk_data_ready(other);
@@ -1538,6 +1541,7 @@ static void unix_sock_inherit_flags(const struct socket *old,
 		set_bit(SOCK_PASSSEC, &new->flags);
 }
 
+// UDS接收请求函数
 static int unix_accept(struct socket *sock, struct socket *newsock, int flags,
 		       bool kern)
 {
@@ -1566,7 +1570,7 @@ static int unix_accept(struct socket *sock, struct socket *newsock, int flags,
 		goto out;
 	}
 
-	tsk = skb->sk;
+	tsk = skb->sk; // tsk即为connect函数中创建的sock中介(newsk)
 	skb_free_datagram(sk, skb);
 	wake_up_interruptible(&unix_sk(sk)->peer_wait);
 
@@ -2016,6 +2020,7 @@ static int queue_oob(struct socket *sock, struct msghdr *msg, struct sock *other
 }
 #endif
 
+// UDS发送数据
 static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 			       size_t len)
 {
@@ -2069,6 +2074,7 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 
 		data_len = min_t(size_t, size, PAGE_ALIGN(data_len));
 
+		// 分配skb
 		skb = sock_alloc_send_pskb(sk, size - data_len, data_len,
 					   msg->msg_flags & MSG_DONTWAIT, &err,
 					   get_order(UNIX_SKB_FRAGS_SZ));
@@ -2086,6 +2092,8 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 		skb_put(skb, size - data_len);
 		skb->data_len = data_len;
 		skb->len = size;
+
+		// 拷贝用户数据到内核缓存区
 		err = skb_copy_datagram_from_iter(skb, 0, &msg->msg_iter, size);
 		if (err) {
 			kfree_skb(skb);
@@ -2100,9 +2108,9 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 
 		maybe_add_creds(skb, sock, other);
 		scm_stat_add(other, skb);
-		skb_queue_tail(&other->sk_receive_queue, skb);
+		skb_queue_tail(&other->sk_receive_queue, skb); // 将skb放入对端的接收队列
 		unix_state_unlock(other);
-		other->sk_data_ready(other);
+		other->sk_data_ready(other); // 数据发送完毕回调函数
 		sent += size;
 	}
 

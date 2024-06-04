@@ -778,7 +778,7 @@ struct sk_buff {
 	};
 
 	union {
-		struct sock		*sk;
+		struct sock		*sk; // skb所属的sock
 		int			ip_defrag_offset;
 	};
 

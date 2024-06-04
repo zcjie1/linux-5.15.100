@@ -1984,7 +1984,7 @@ static inline void sock_graft(struct sock *sk, struct socket *parent)
 	WARN_ON(parent->sk);
 	write_lock_bh(&sk->sk_callback_lock);
 	rcu_assign_pointer(sk->sk_wq, &parent->wq);
-	parent->sk = sk;
+	parent->sk = sk; // 将accept新创建的socket的对应sock设置为中介sock
 	sk_set_socket(sk, parent);
 	sk->sk_uid = SOCK_INODE(parent)->i_uid;
 	security_sock_graft(sk, parent);
