@@ -1017,6 +1017,7 @@ struct vfsmount *fc_mount(struct fs_context *fc)
 }
 EXPORT_SYMBOL(fc_mount);
 
+// 完成挂载点、超级块、根目录和索引节点的创建和初始化
 struct vfsmount *vfs_kern_mount(struct file_system_type *type,
 				int flags, const char *name,
 				void *data)
@@ -4410,7 +4411,7 @@ void __init mnt_init(void)
 		printk(KERN_WARNING "%s: sysfs_init error: %d\n",
 			__func__, err);
 	
-	// 创建fs kobject并加入到sysfs中
+	// 创建fs kobject并加入到sysfs中(fs目录)
 	fs_kobj = kobject_create_and_add("fs", NULL);
 	if (!fs_kobj)
 		printk(KERN_WARNING "%s: kobj create error\n", __func__);
@@ -4418,7 +4419,10 @@ void __init mnt_init(void)
 	// tmpfs初始化
 	shmem_init();
 
+	// rootfs初始化
 	init_rootfs();
+
+	// 挂载rootfs, 生成mount tree
 	init_mount_tree();
 }
 
@@ -4430,7 +4434,7 @@ void put_mnt_ns(struct mnt_namespace *ns)
 	free_mnt_ns(ns);
 }
 
-// kernel内部挂载文件系统
+// kernel内部挂载文件系统(完成挂载点、超级块、根目录和索引节点的创建和初始化)
 struct vfsmount *kern_mount(struct file_system_type *type)
 {
 	struct vfsmount *mnt;

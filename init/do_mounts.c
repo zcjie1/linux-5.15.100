@@ -30,7 +30,7 @@
 
 int root_mountflags = MS_RDONLY | MS_SILENT;
 static char * __initdata root_device_name;
-static char __initdata saved_root_name[64];
+static char __initdata saved_root_name[64]; // 在start_kernel中由parse_args函数初始化
 static int root_wait;
 
 dev_t ROOT_DEV;

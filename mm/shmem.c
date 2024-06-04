@@ -40,6 +40,7 @@
 #include <linux/fs_parser.h>
 #include <linux/swapfile.h>
 
+// tmpfs挂载信息
 static struct vfsmount *shm_mnt;
 
 #ifdef CONFIG_SHMEM

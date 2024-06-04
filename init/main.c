@@ -981,6 +981,8 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	/* parameters may set static keys */
 	jump_label_init();
 	parse_early_param();
+
+	// 解析command line参数
 	after_dashes = parse_args("Booting kernel",
 				  static_command_line, __start___param,
 				  __stop___param - __start___param,
