@@ -4354,6 +4354,7 @@ static void __init init_mount_tree(void)
 	struct mnt_namespace *ns;
 	struct path root;
 
+	// rootfs挂载点、超级块、根目录和索引节点的创建和初始化
 	mnt = vfs_kern_mount(&rootfs_fs_type, 0, "rootfs", NULL);
 	if (IS_ERR(mnt))
 		panic("Can't create rootfs");
