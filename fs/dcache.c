@@ -1754,7 +1754,7 @@ static struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
 	 */
 	dentry->d_iname[DNAME_INLINE_LEN-1] = 0;
 	if (unlikely(!name)) {
-		name = &slash_name;
+		name = &slash_name; // "/"
 		dname = dentry->d_iname;
 	} else if (name->len > DNAME_INLINE_LEN-1) {
 		size_t size = offsetof(struct external_name, name[1]);
@@ -1811,7 +1811,7 @@ static struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
 }
 
 /**
- * d_alloc	-	allocate a dcache entry
+ * d_alloc - allocate a dcache entry
  * @parent: parent of entry to allocate
  * @name: qstr of the name
  *
@@ -3262,6 +3262,7 @@ void __init vfs_caches_init_early(void)
 	inode_init_early();
 }
 
+// VFS初始化
 void __init vfs_caches_init(void)
 {
 	// 创建slab内存池，用于__getname()函数

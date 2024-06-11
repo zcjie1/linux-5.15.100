@@ -10,7 +10,7 @@ struct ns_common {
 	atomic_long_t stashed;
 	const struct proc_ns_operations *ops;
 	unsigned int inum;
-	refcount_t count;
+	refcount_t count; // 命名空间引用计数
 };
 
 #endif

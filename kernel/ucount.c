@@ -15,6 +15,7 @@ struct ucounts init_ucounts = {
 };
 
 #define UCOUNTS_HASHTABLE_BITS 10
+// ucount全局管理结构
 static struct hlist_head ucounts_hashtable[(1 << UCOUNTS_HASHTABLE_BITS)];
 static DEFINE_SPINLOCK(ucounts_lock);
 
@@ -159,6 +160,7 @@ struct ucounts *get_ucounts(struct ucounts *ucounts)
 	return ucounts;
 }
 
+// 分配ucounts结构体
 struct ucounts *alloc_ucounts(struct user_namespace *ns, kuid_t uid)
 {
 	struct hlist_head *hashent = ucounts_hashentry(ns, uid);
@@ -166,14 +168,16 @@ struct ucounts *alloc_ucounts(struct user_namespace *ns, kuid_t uid)
 	long overflow;
 
 	spin_lock_irq(&ucounts_lock);
-	ucounts = find_ucounts(ns, uid, hashent);
+	ucounts = find_ucounts(ns, uid, hashent); // 查找是否有ucounts符合(ns, uid)
 	if (!ucounts) {
 		spin_unlock_irq(&ucounts_lock);
 
+		// 分配ucounts内存
 		new = kzalloc(sizeof(*new), GFP_KERNEL);
 		if (!new)
 			return NULL;
 
+		// 初始化ucounts
 		new->ns = ns;
 		new->uid = uid;
 		atomic_set(&new->count, 1);
@@ -189,6 +193,8 @@ struct ucounts *alloc_ucounts(struct user_namespace *ns, kuid_t uid)
 			return new;
 		}
 	}
+
+	// 检查是否溢出
 	overflow = atomic_add_negative(1, &ucounts->count);
 	spin_unlock_irq(&ucounts_lock);
 	if (overflow) {

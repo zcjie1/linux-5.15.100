@@ -1083,7 +1083,7 @@ struct task_struct {
 	unsigned long			last_switch_time;
 #endif
 	/* Filesystem information: */
-	struct fs_struct		*fs;
+	struct fs_struct		*fs; // 保存进程的根目录和当前工作目录
 
 	/* Open file information: */
 	struct files_struct		*files; // 当前进程打开的文件

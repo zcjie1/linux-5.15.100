@@ -13,7 +13,7 @@ struct mnt_namespace {
 	 * - taking namespace_sem for write, OR
 	 * - taking namespace_sem for read AND taking .ns_lock.
 	 */
-	struct list_head	list;
+	struct list_head	list; // mount结构体链表
 	spinlock_t		ns_lock;
 	struct user_namespace	*user_ns;
 	struct ucounts		*ucounts;
@@ -55,7 +55,7 @@ struct mount {
 	struct list_head mnt_child;	/* and going through their mnt_child */
 	struct list_head mnt_instance;	/* mount instance on sb->s_mounts */
 	const char *mnt_devname;	/* Name of device e.g. /dev/dsk/hda1 */
-	struct list_head mnt_list;
+	struct list_head mnt_list; // 接入mnt_ns
 	struct list_head mnt_expire;	/* link in fs-specific expiry list */
 	struct list_head mnt_share;	/* circular list of shared mounts */
 	struct list_head mnt_slave_list;/* list of slave mounts */

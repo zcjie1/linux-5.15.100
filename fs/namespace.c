@@ -3406,15 +3406,19 @@ static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns, bool a
 	struct ucounts *ucounts;
 	int ret;
 
+	// 获取mnt_ns对应的ucounts，并增加mnt_ns计数
 	ucounts = inc_mnt_namespaces(user_ns);
 	if (!ucounts)
 		return ERR_PTR(-ENOSPC);
 
+	// 分配mnt namespace内存
 	new_ns = kzalloc(sizeof(struct mnt_namespace), GFP_KERNEL_ACCOUNT);
 	if (!new_ns) {
 		dec_mnt_namespaces(ucounts);
 		return ERR_PTR(-ENOMEM);
 	}
+
+	// 若为非匿名，分配ns_common的inum
 	if (!anon) {
 		ret = ns_alloc_inum(&new_ns->ns);
 		if (ret) {
@@ -3423,9 +3427,15 @@ static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns, bool a
 			return ERR_PTR(ret);
 		}
 	}
+
+	// mount命名空间操作函数初始化
 	new_ns->ns.ops = &mntns_operations;
+
+	// mount命名空间序号
 	if (!anon)
 		new_ns->seq = atomic64_add_return(1, &mnt_ns_seq);
+	
+	// mnt_ns初始化
 	refcount_set(&new_ns->ns.count, 1);
 	INIT_LIST_HEAD(&new_ns->list);
 	init_waitqueue_head(&new_ns->poll);
@@ -4347,6 +4357,7 @@ SYSCALL_DEFINE5(mount_setattr, int, dfd, const char __user *, path,
 	return err;
 }
 
+// rootfs初始化, 生成mnt_ns，设置工作目录
 static void __init init_mount_tree(void)
 {
 	struct vfsmount *mnt;
@@ -4354,26 +4365,32 @@ static void __init init_mount_tree(void)
 	struct mnt_namespace *ns;
 	struct path root;
 
-	// rootfs挂载点、超级块、根目录和索引节点的创建和初始化
+	// rootfs挂载点(mount)、超级块(super_blcok)、根目录(dentry)和索引节点(inode)的创建和初始化
 	mnt = vfs_kern_mount(&rootfs_fs_type, 0, "rootfs", NULL);
 	if (IS_ERR(mnt))
 		panic("Can't create rootfs");
 
+	// 分配mnt_ns
 	ns = alloc_mnt_ns(&init_user_ns, false);
 	if (IS_ERR(ns))
 		panic("Can't allocate initial namespace");
-	m = real_mount(mnt);
+	
+	m = real_mount(mnt); // vfs_mount对应的mount结构体
 	m->mnt_ns = ns;
+
 	ns->root = m;
 	ns->mounts = 1;
-	list_add(&m->mnt_list, &ns->list);
-	init_task.nsproxy->mnt_ns = ns;
-	get_mnt_ns(ns);
+	
+	list_add(&m->mnt_list, &ns->list); // 将mount纳入mnt_ns管理
+	init_task.nsproxy->mnt_ns = ns; // 初始化当前进程的mnt命名空间
+	get_mnt_ns(ns); // 增加引用计数
 
+	// 初始化struct path root
 	root.mnt = mnt;
 	root.dentry = mnt->mnt_root;
 	mnt->mnt_flags |= MNT_LOCKED;
 
+	// 设置当前进程的工作目录和根目录
 	set_fs_pwd(current->fs, &root);
 	set_fs_root(current->fs, &root);
 }
@@ -4420,10 +4437,11 @@ void __init mnt_init(void)
 	// tmpfs初始化
 	shmem_init();
 
-	// rootfs初始化
+	// 判断是否存在磁盘文件系统
+	// 若不存在，则使用tmpfs作为rootfs
 	init_rootfs();
 
-	// 挂载rootfs, 生成mount tree
+	// rootfs初始化, 生成mnt_ns，设置工作目录
 	init_mount_tree();
 }
 
@@ -4679,6 +4697,7 @@ static struct user_namespace *mntns_owner(struct ns_common *ns)
 	return to_mnt_ns(ns)->user_ns;
 }
 
+// mount namespace操作函数
 const struct proc_ns_operations mntns_operations = {
 	.name		= "mnt",
 	.type		= CLONE_NEWNS,

@@ -103,6 +103,9 @@ struct user_namespace {
 	long ucount_max[UCOUNT_COUNTS];
 } __randomize_layout;
 
+// user namespace + uid 唯一确定一个ucounts
+// 一个ucounts对应多种namespace
+// 每种namespce可以有多个
 struct ucounts {
 	struct hlist_node node;
 	struct user_namespace *ns;

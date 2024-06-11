@@ -635,6 +635,7 @@ struct fsnotify_mark_connector;
  * of the 'struct inode'
  * 
  * 文件节点
+ * inode结构体
  */
 struct inode {
 	umode_t			i_mode; // 文件类型
