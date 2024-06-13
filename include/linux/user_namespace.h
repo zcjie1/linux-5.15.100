@@ -111,6 +111,8 @@ struct ucounts {
 	struct user_namespace *ns;
 	kuid_t uid;
 	atomic_t count;
+
+	 // 当前user namespace中各类命名空间的数量(受子user namespace影响)
 	atomic_long_t ucount[UCOUNT_COUNTS];
 };
 

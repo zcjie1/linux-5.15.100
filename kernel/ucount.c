@@ -236,6 +236,7 @@ struct ucounts *inc_ucount(struct user_namespace *ns, kuid_t uid,
 	struct ucounts *ucounts, *iter, *bad;
 	struct user_namespace *tns;
 	ucounts = alloc_ucounts(ns, uid);
+	// user namespace为树状结构，向上递归父节点增加相应命名空间引用计数
 	for (iter = ucounts; iter; iter = tns->ucounts) {
 		long max;
 		tns = iter->ns;
