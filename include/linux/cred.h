@@ -106,6 +106,19 @@ static inline int groups_search(const struct group_info *group_info, kgid_t grp)
  * that task is going to act upon another object.  This may be overridden
  * temporarily to point to another security context, but normally points to the
  * same context as task->real_cred.
+ * 
+ * 进程的安全上下文
+ * 
+ * 上下文的内部分为两类:
+ * （1）进程的`客体`上下文。当某些其他进程试图影响本进程时，将使用这些部分。
+ * （2）`主体`上下文。当进程作用于另一个对象（文件、进程、键或其他对象）时，将使用这些详细信息
+ * 
+ * 请注意，此结构体的某些成员同时属于这两个类别 - 例如LSM安全指针
+ * 
+ * 一个进程有两个安全指针:
+ * 1、`task->real_cred`指向`客体`上下文，它定义了进程的实际细节。每当该进程被其他人作用时，都会使用此上下文的客观部分。
+ * 2、`task->cred`指向`主体`上下文，该上下文定义了该任务将如何作用于另一个对象的详细信息。
+ * 可能会暂时覆盖它以指向另一个安全上下文，但通常指向与task->real_cred相同的上下文。
  */
 struct cred {
 	atomic_t	usage;
@@ -116,14 +129,27 @@ struct cred {
 #define CRED_MAGIC	0x43736564
 #define CRED_MAGIC_DEAD	0x44656144
 #endif
+
+	/* 进程原本的uid，gid */
+
 	kuid_t		uid;		/* real UID of the task */
 	kgid_t		gid;		/* real GID of the task */
-	kuid_t		suid;		/* saved UID of the task */
-	kgid_t		sgid;		/* saved GID of the task */
-	kuid_t		euid;		/* effective UID of the task */
-	kgid_t		egid;		/* effective GID of the task */
+
+	/* 在SUID机制设置euid时，suid同时被设置成euid; 在setuid()设置uid时，suid同时被设置成uid */
+
+	kuid_t		suid;		/* saved UID of the task uid缓存*/
+	kgid_t		sgid;		/* saved GID of the task gid缓存*/
+
+	/* 有效id，权限判断时看的就是exid */
+
+	kuid_t		euid;		/* effective UID of the task 有效UID*/
+	kgid_t		egid;		/* effective GID of the task 有效GID*/
+
+	/* 通常与euid相等，但可以通过setfsuid改变 */
+
 	kuid_t		fsuid;		/* UID for VFS ops */
 	kgid_t		fsgid;		/* GID for VFS ops */
+
 	unsigned	securebits;	/* SUID-less security management */
 	kernel_cap_t	cap_inheritable; /* caps our children can inherit */
 	kernel_cap_t	cap_permitted;	/* caps we're permitted */
