@@ -142,7 +142,7 @@ extern void time_init(void);
 void (*__initdata late_time_init)(void);
 
 /* Untouched command line saved by arch-specific code. */
-char __initdata boot_command_line[COMMAND_LINE_SIZE];
+char __initdata boot_command_line[COMMAND_LINE_SIZE]; // 内核启动参数
 /* Untouched saved command line (eg. for /proc) */
 char *saved_command_line;
 /* Command line for parameter parsing */
@@ -192,10 +192,10 @@ static int __init set_reset_devices(char *str)
 __setup("reset_devices", set_reset_devices);
 
 static const char *argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
-const char *envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
+const char *envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, }; // environment param
 static const char *panic_later, *panic_param;
 
-extern const struct obs_kernel_param __setup_start[], __setup_end[];
+extern const struct obs_kernel_param __setup_start[], __setup_end[]; // 启动参数列表
 
 static bool __init obsolete_checksetup(char *line)
 {
@@ -598,6 +598,7 @@ static int __init init_setup(char *str)
 }
 __setup("init=", init_setup);
 
+// init程序路径设置
 static int __init rdinit_setup(char *str)
 {
 	unsigned int i;
@@ -1402,7 +1403,8 @@ static void __init do_initcalls(void)
 	command_line = kzalloc(len, GFP_KERNEL);
 	if (!command_line)
 		panic("%s: Failed to allocate %zu bytes\n", __func__, len);
-
+	
+	// 根据initcall_level_names中的顺序依次调用相关initcall
 	for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++) {
 		/* Parser modifies command_line, restore it each time */
 		strcpy(command_line, saved_command_line);
@@ -1633,7 +1635,7 @@ static noinline void __init kernel_init_freeable(void)
 	/* Initialize page ext after all struct pages are initialized. */
 	page_ext_init();
 
-	do_basic_setup();
+	do_basic_setup(); // initramfs初始化
 
 	kunit_run_all_tests();
 

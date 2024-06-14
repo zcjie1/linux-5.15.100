@@ -12,7 +12,7 @@
 
 #include "do_mounts.h"
 
-unsigned long initrd_start, initrd_end;
+unsigned long initrd_start, initrd_end; // initramfs内存起始地址与结束地址，由bootloader加载
 int initrd_below_start_ok;
 unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
 static int __initdata mount_initrd = 1;

@@ -180,7 +180,7 @@ char *parse_args(const char *doing,
 		int ret;
 		int irq_was_disabled;
 
-		args = next_arg(args, &param, &val);
+		args = next_arg(args, &param, &val); // 获取参数，param为键，val为值
 		/* Stop at -- */
 		if (!val && strcmp(param, "--") == 0)
 			return err ?: args;

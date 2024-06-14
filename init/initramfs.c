@@ -60,6 +60,7 @@ static void panic_show_mem(const char *fmt, ...)
 
 /* link hash */
 
+// 将len调整到下一个大于它的2字节对齐的边界
 #define N_ALIGN(len) ((((len) + 1) & ~3) + 2)
 
 static __initdata struct hash {
@@ -127,11 +128,11 @@ static long __init do_utime(char *filename, time64_t mtime)
 	return init_utimes(filename, t);
 }
 
-static __initdata LIST_HEAD(dir_list);
+static __initdata LIST_HEAD(dir_list); // 目录项管理结构，暂存创建时间信息
 struct dir_entry {
 	struct list_head list;
-	char *name;
-	time64_t mtime;
+	char *name; // 目录名
+	time64_t mtime; // 创建时间
 };
 
 static void __init dir_add(const char *name, time64_t mtime)
@@ -150,7 +151,7 @@ static void __init dir_utime(void)
 	struct dir_entry *de, *tmp;
 	list_for_each_entry_safe(de, tmp, &dir_list, list) {
 		list_del(&de->list);
-		do_utime(de->name, de->mtime);
+		do_utime(de->name, de->mtime); // 正式记录创建时间
 		kfree(de->name);
 		kfree(de);
 	}
@@ -158,7 +159,7 @@ static void __init dir_utime(void)
 
 static __initdata time64_t mtime;
 
-/* cpio header parsing */
+/* cpio header parsing cpio文件头 */
 
 static __initdata unsigned long ino, major, minor, nlink;
 static __initdata umode_t mode;
@@ -167,7 +168,7 @@ static __initdata uid_t uid;
 static __initdata gid_t gid;
 static __initdata unsigned rdev;
 
-static void __init parse_header(char *s)
+static void __init parse_header(char *s) // 解析cpio文件头
 {
 	unsigned long parsed[12];
 	char buf[9];
@@ -176,7 +177,7 @@ static void __init parse_header(char *s)
 	buf[8] = '\0';
 	for (i = 0, s += 6; i < 12; i++, s += 8) {
 		memcpy(buf, s, 8);
-		parsed[i] = simple_strtoul(buf, NULL, 16);
+		parsed[i] = simple_strtoul(buf, NULL, 16); // 将buf转换为unsigned long
 	}
 	ino = parsed[0];
 	mode = parsed[1];
@@ -193,29 +194,30 @@ static void __init parse_header(char *s)
 
 /* FSM */
 
+// cpio文件解压状态机
 static __initdata enum state {
-	Start,
-	Collect,
-	GotHeader,
-	SkipIt,
-	GotName,
-	CopyFile,
-	GotSymlink,
-	Reset
+	Start, 		// 初始状态
+	Collect, 	// 获取符号链接文件信息
+	GotHeader, 	// 获取文件头
+	SkipIt, 	// 跳过
+	GotName, 	// 获取文件名并新建文件
+	CopyFile, 	// 写文件
+	GotSymlink, // 新建符号链接文件
+	Reset 		// 终止
 } state, next_state;
 
-static __initdata char *victim;
-static unsigned long byte_count __initdata;
-static __initdata loff_t this_header, next_header;
+static __initdata char *victim; // 待读取数据
+static unsigned long byte_count __initdata; // 剩余待读取字节数
+static __initdata loff_t this_header, next_header; // 当前文件头结束地址; 下一文件头开始地址
 
-static inline void __init eat(unsigned n)
+static inline void __init eat(unsigned n) // 读取n个字节
 {
 	victim += n;
 	this_header += n;
 	byte_count -= n;
 }
 
-static __initdata char *collected;
+static __initdata char *collected; // 当前轮次已读取数据的起始地址，victim为待读取数据的起始地址
 static long remains __initdata;
 static __initdata char *collect;
 
@@ -233,6 +235,11 @@ static void __init read_into(char *buf, unsigned size, enum state next)
 	}
 }
 
+/** 参考https://www.cnblogs.com/alantu2018/p/8447307.html
+ * header_buf为cpio段文件头，
+ * symlink_buf为cpio段符号链接文件名
+ * name_buf为cpio段普通文件名
+*/
 static __initdata char *header_buf, *symlink_buf, *name_buf;
 
 static int __init do_start(void)
@@ -265,13 +272,13 @@ static int __init do_header(void)
 		error("no cpio magic");
 		return 1;
 	}
-	parse_header(collected);
+	parse_header(collected); // 解析文件头
 	next_header = this_header + N_ALIGN(name_len) + body_len;
 	next_header = (next_header + 3) & ~3;
 	state = SkipIt;
 	if (name_len <= 0 || name_len > PATH_MAX)
 		return 0;
-	if (S_ISLNK(mode)) {
+	if (S_ISLNK(mode)) { // 链接文件
 		if (body_len > PATH_MAX)
 			return 0;
 		collect = collected = symlink_buf;
@@ -280,7 +287,7 @@ static int __init do_header(void)
 		state = Collect;
 		return 0;
 	}
-	if (S_ISREG(mode) || !body_len)
+	if (S_ISREG(mode) || !body_len) // 普通文件或文件体长度为0
 		read_into(name_buf, N_ALIGN(name_len), GotName);
 	return 0;
 }
@@ -361,10 +368,10 @@ static int __init do_name(void)
 			state = CopyFile;
 		}
 	} else if (S_ISDIR(mode)) {
-		init_mkdir(collected, mode);
-		init_chown(collected, uid, gid, 0);
-		init_chmod(collected, mode);
-		dir_add(collected, mtime);
+		init_mkdir(collected, mode); // 创建目录
+		init_chown(collected, uid, gid, 0); // 初始化文件所有者
+		init_chmod(collected, mode); // 初始化文件权限
+		dir_add(collected, mtime); // 添加目录项
 	} else if (S_ISBLK(mode) || S_ISCHR(mode) ||
 		   S_ISFIFO(mode) || S_ISSOCK(mode)) {
 		if (maybe_link() == 0) {
@@ -413,6 +420,7 @@ static int __init do_symlink(void)
 	return 0;
 }
 
+// cpio解压各个状态对应的处理函数
 static __initdata int (*actions[])(void) = {
 	[Start]		= do_start,
 	[Collect]	= do_collect,
@@ -461,6 +469,7 @@ static unsigned long my_inptr; /* index of next byte to be processed in inbuf */
 
 #include <linux/decompress/generic.h>
 
+// 解压initrd文件(cpio格式)
 static char * __init unpack_to_rootfs(char *buf, unsigned long len)
 {
 	long written;
@@ -468,6 +477,7 @@ static char * __init unpack_to_rootfs(char *buf, unsigned long len)
 	const char *compress_name;
 	static __initdata char msg_buf[64];
 
+	// 分配cpio文件段缓冲区
 	header_buf = kmalloc(110, GFP_KERNEL);
 	symlink_buf = kmalloc(PATH_MAX + N_ALIGN(PATH_MAX) + 1, GFP_KERNEL);
 	name_buf = kmalloc(N_ALIGN(PATH_MAX), GFP_KERNEL);
@@ -516,7 +526,7 @@ static char * __init unpack_to_rootfs(char *buf, unsigned long len)
 		buf += my_inptr;
 		len -= my_inptr;
 	}
-	dir_utime();
+	dir_utime(); // 正式记录目录创建时间
 	kfree(name_buf);
 	kfree(symlink_buf);
 	kfree(header_buf);
@@ -551,7 +561,7 @@ static int __init initramfs_async_setup(char *str)
 }
 __setup("initramfs_async=", initramfs_async_setup);
 
-extern char __initramfs_start[];
+extern char __initramfs_start[]; // 在内核编译的过程中生成，指向内嵌于内核的initramfs
 extern unsigned long __initramfs_size;
 #include <linux/initrd.h>
 #include <linux/kexec.h>
@@ -683,7 +693,7 @@ static void __init do_populate_rootfs(void *unused, async_cookie_t cookie)
 	else
 		printk(KERN_INFO "Unpacking initramfs...\n");
 
-	err = unpack_to_rootfs((char *)initrd_start, initrd_end - initrd_start);
+	err = unpack_to_rootfs((char *)initrd_start, initrd_end - initrd_start); // 解压initrd文件，填充文件系统
 	if (err) {
 #ifdef CONFIG_BLK_DEV_RAM
 		populate_initrd_image(err);
@@ -724,6 +734,7 @@ void wait_for_initramfs(void)
 }
 EXPORT_SYMBOL_GPL(wait_for_initramfs);
 
+// rootfs文件录入
 static int __init populate_rootfs(void)
 {
 	initramfs_cookie = async_schedule_domain(do_populate_rootfs, NULL,
@@ -733,4 +744,4 @@ static int __init populate_rootfs(void)
 		wait_for_initramfs();
 	return 0;
 }
-rootfs_initcall(populate_rootfs);
+rootfs_initcall(populate_rootfs); // initramfs文件系统initcall函数声明
