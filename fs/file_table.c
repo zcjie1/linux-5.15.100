@@ -93,6 +93,7 @@ int proc_nr_files(struct ctl_table *table, int write,
 }
 #endif
 
+// 分配struct file
 static struct file *__alloc_file(int flags, const struct cred *cred)
 {
 	struct file *f;
@@ -136,7 +137,7 @@ struct file *alloc_empty_file(int flags, const struct cred *cred)
 	struct file *f;
 
 	/*
-	 * Privileged users can go above max_files
+	 * Privileged users can go above max_files 边界判断
 	 */
 	if (get_nr_files() >= files_stat.max_files && !capable(CAP_SYS_ADMIN)) {
 		/*

@@ -101,7 +101,8 @@ static unsigned int d_hash_shift __read_mostly;
 // dentry哈希管理结构(内核全局)
 static struct hlist_bl_head *dentry_hashtable __read_mostly;
 
-static inline struct hlist_bl_head *d_hash(unsigned int hash)
+// 获取文件名哈希值对应的哈希表头
+static inline struct hlist_bl_head *d_hash(unsigned int hash) 
 {
 	return dentry_hashtable + (hash >> d_hash_shift);
 }
@@ -1811,7 +1812,7 @@ static struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
 }
 
 /**
- * d_alloc - allocate a dcache entry
+ * d_alloc - allocate a dcache entry——创建目录，分配内存并初始化
  * @parent: parent of entry to allocate
  * @name: qstr of the name
  *
@@ -1831,7 +1832,7 @@ struct dentry *d_alloc(struct dentry * parent, const struct qstr *name)
 	 */
 	__dget_dlock(parent);
 	dentry->d_parent = parent;
-	list_add(&dentry->d_child, &parent->d_subdirs);
+	list_add(&dentry->d_child, &parent->d_subdirs); // 将子目录加入父目录管理链表中
 	spin_unlock(&parent->d_lock);
 
 	return dentry;
@@ -1887,6 +1888,7 @@ struct dentry *d_alloc_name(struct dentry *parent, const char *name)
 }
 EXPORT_SYMBOL(d_alloc_name);
 
+// 设置目录操作函数
 void d_set_d_op(struct dentry *dentry, const struct dentry_operations *op)
 {
 	WARN_ON_ONCE(dentry->d_op);
@@ -2377,7 +2379,7 @@ struct dentry *d_lookup(const struct dentry *parent, const struct qstr *name)
 EXPORT_SYMBOL(d_lookup);
 
 /**
- * __d_lookup - search for a dentry (racy)
+ * __d_lookup - search for a dentry (racy) 在哈希表中查找已缓存的dentry
  * @parent: parent dentry
  * @name: qstr of name we wish to find
  * Returns: dentry, or NULL
@@ -2512,6 +2514,7 @@ void d_delete(struct dentry * dentry)
 }
 EXPORT_SYMBOL(d_delete);
 
+// 重新计算hash值，并将dentry接入dentry hash表中
 static void __d_rehash(struct dentry *entry)
 {
 	struct hlist_bl_head *b = d_hash(entry->d_name.hash);
@@ -2711,7 +2714,7 @@ static inline void __d_add(struct dentry *dentry, struct inode *inode)
 		raw_write_seqcount_end(&dentry->d_seq);
 		fsnotify_update_flags(dentry);
 	}
-	__d_rehash(dentry);
+	__d_rehash(dentry); // 将dentry接入到dentry hash表中
 	if (dir)
 		end_dir_add(dir, n);
 	spin_unlock(&dentry->d_lock);

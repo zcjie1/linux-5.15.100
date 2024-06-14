@@ -220,15 +220,18 @@ int __init init_unlink(const char *pathname)
 	return do_unlinkat(AT_FDCWD, getname_kernel(pathname));
 }
 
-int __init init_mkdir(const char *pathname, umode_t mode)
+// 创建目录
+int __init init_mkdir(const char *pathname, umode_t mode) 
 {
 	struct dentry *dentry;
 	struct path path;
 	int error;
 
+	// 生成path结构体，并返回相应dentry
 	dentry = kern_path_create(AT_FDCWD, pathname, &path, LOOKUP_DIRECTORY);
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
+	
 	if (!IS_POSIXACL(path.dentry->d_inode))
 		mode &= ~current_umask();
 	error = security_path_mkdir(&path, dentry, mode);

@@ -2712,7 +2712,7 @@ struct filename {
 	const __user char	*uptr;	/* original userland pointer */
 	int			refcnt; // 引用计数初始化为1
 	struct audit_names	*aname;
-	const char		iname[];
+	const char		iname[]; // 若名字长度较短，则存储在iname中
 };
 static_assert(offsetof(struct filename, iname) % sizeof(long) == 0);
 

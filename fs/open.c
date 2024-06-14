@@ -1169,12 +1169,12 @@ struct file *file_open_name(struct filename *name, int flags, umode_t mode)
  */
 struct file *filp_open(const char *filename, int flags, umode_t mode)
 {
-	struct filename *name = getname_kernel(filename);
+	struct filename *name = getname_kernel(filename); // 分配name所占内存
 	struct file *file = ERR_CAST(name);
 	
 	if (!IS_ERR(name)) {
 		file = file_open_name(name, flags, mode);
-		putname(name);
+		putname(name); // 减少引用计数
 	}
 	return file;
 }

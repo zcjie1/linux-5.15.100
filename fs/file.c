@@ -584,7 +584,7 @@ void put_unused_fd(unsigned int fd)
 EXPORT_SYMBOL(put_unused_fd);
 
 /*
- * Install a file pointer in the fd array.
+ * Install a file pointer in the fd array. 将文件加入到进程的打开列表
  *
  * The VFS is full of places where we drop the files lock between
  * setting the open_fds bitmap and installing the file in the file
@@ -598,7 +598,6 @@ EXPORT_SYMBOL(put_unused_fd);
  * This consumes the "file" refcount, so callers should treat it
  * as if they had called fput(file).
  */
-// 将文件加入到进程的打开列表
 void fd_install(unsigned int fd, struct file *file)
 {
 	struct files_struct *files = current->files;

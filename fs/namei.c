@@ -229,19 +229,21 @@ getname(const char __user * filename)
 	return getname_flags(filename, 0, NULL);
 }
 
+// 分配内核中的name内存
 struct filename *
 getname_kernel(const char * filename)
 {
 	struct filename *result;
 	int len = strlen(filename) + 1;
 
+	// 分配name内存空间
 	result = __getname();
 	if (unlikely(!result))
 		return ERR_PTR(-ENOMEM);
 
-	if (len <= EMBEDDED_NAME_MAX) {
-		result->name = (char *)result->iname;
-	} else if (len <= PATH_MAX) {
+	if (len <= EMBEDDED_NAME_MAX) { // 若文件名较短，储存在iname中
+		result->name = (char *)result->iname; 
+	} else if (len <= PATH_MAX) { // 若文件名较长，另开一份filename(4096字节)以作存储
 		const size_t size = offsetof(struct filename, iname[1]);
 		struct filename *tmp;
 
@@ -252,11 +254,11 @@ getname_kernel(const char * filename)
 		}
 		tmp->name = (char *)result;
 		result = tmp;
-	} else {
+	} else { // 若文件名过长，返回错误
 		__putname(result);
 		return ERR_PTR(-ENAMETOOLONG);
 	}
-	memcpy((char *)result->name, filename, len);
+	memcpy((char *)result->name, filename, len); // 填充name
 	result->uptr = NULL;
 	result->aname = NULL;
 	result->refcnt = 1;
@@ -621,6 +623,7 @@ static void __set_nameidata(struct nameidata *p, int dfd, struct filename *name)
 	current->nameidata = p;
 }
 
+// 初始化文件查找结构体
 static inline void set_nameidata(struct nameidata *p, int dfd, struct filename *name,
 			  const struct path *root)
 {
@@ -634,7 +637,7 @@ static inline void set_nameidata(struct nameidata *p, int dfd, struct filename *
 	}
 }
 
-static void restore_nameidata(void)
+static void restore_nameidata(void) // 还原当前进程的nameidata
 {
 	struct nameidata *now = current->nameidata, *old = now->saved;
 
@@ -1539,7 +1542,7 @@ static inline int handle_mounts(struct nameidata *nd, struct dentry *dentry,
 	return ret;
 }
 
-/*
+/* 在dentry hash中查找已经缓存的dentry
  * This looks up the name in dcache and possibly revalidates the found dentry.
  * NULL is returned if the dentry does not exist in the cache.
  */
@@ -1560,7 +1563,7 @@ static struct dentry *lookup_dcache(const struct qstr *name,
 	return dentry;
 }
 
-/*
+/* 在父目录base中查找文件名为name的目录项
  * Parent directory has inode locked exclusive.  This is one
  * and only case when ->lookup() gets called on non in-lookup
  * dentries - as the matter of fact, this only gets called
@@ -2310,7 +2313,7 @@ static int link_path_walk(const char *name, struct nameidata *nd)
 		if (err)
 			return err;
 
-		// 计算name单元哈希值和name长度(以'/'符号划分单元)
+		// 计算name单元哈希值和name单元长度(以'/'符号划分单元)
 		hash_len = hash_name(nd->path.dentry, name);
 
 		type = LAST_NORM;
@@ -2451,7 +2454,7 @@ static const char *path_init(struct nameidata *nd, unsigned flags)
 		return s;
 	}
 
-	/* Relative pathname -- get the starting-point it is relative to. */
+	/* 相对路径查找 Relative pathname -- get the starting-point it is relative to. */
 	if (nd->dfd == AT_FDCWD) {
 		if (flags & LOOKUP_RCU) {
 			struct fs_struct *fs = current->fs;
@@ -2595,10 +2598,10 @@ int filename_lookup(int dfd, struct filename *name, unsigned flags,
 static int path_parentat(struct nameidata *nd, unsigned flags,
 				struct path *parent)
 {
-	const char *s = path_init(nd, flags);
-	int err = link_path_walk(s, nd);
+	const char *s = path_init(nd, flags); // 设置查找起点(nd.path)
+	int err = link_path_walk(s, nd); // 查找中间路径
 	if (!err)
-		err = complete_walk(nd);
+		err = complete_walk(nd); // 查找成功
 	if (!err) {
 		*parent = nd->path;
 		nd->path.mnt = NULL;
@@ -2608,7 +2611,7 @@ static int path_parentat(struct nameidata *nd, unsigned flags,
 	return err;
 }
 
-/* Note: this does not consume "name" */
+/* Note: this does not consume "name" 查找父目录 */
 static int filename_parentat(int dfd, struct filename *name,
 			     unsigned int flags, struct path *parent,
 			     struct qstr *last, int *type)
@@ -3436,6 +3439,7 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
 			goto out_dput;
 		}
 
+		// 创建file dentry对应的inode
 		error = dir_inode->i_op->create(mnt_userns, dir_inode, dentry,
 						mode, open_flag & O_EXCL);
 		if (error)
@@ -3452,6 +3456,7 @@ out_dput:
 	return ERR_PTR(error);
 }
 
+// 查找文件，若不存在则创建(O_CREAT情况下)
 static const char *open_last_lookups(struct nameidata *nd,
 		   struct file *file, const struct open_flags *op)
 {
@@ -3506,7 +3511,7 @@ static const char *open_last_lookups(struct nameidata *nd,
 		inode_lock(dir->d_inode);
 	else
 		inode_lock_shared(dir->d_inode);
-	dentry = lookup_open(nd, file, op, got_write);
+	dentry = lookup_open(nd, file, op, got_write); //查找文件，若不存在则创建
 	if (!IS_ERR(dentry) && (file->f_mode & FMODE_CREATED))
 		fsnotify_create(dir->d_inode, dentry);
 	if (open_flag & O_CREAT)
@@ -3536,7 +3541,7 @@ finish_lookup:
 }
 
 /*
- * Handle the last step of open()
+ * Handle the last step of open()——调用vfs_open，为file对象赋值
  */
 static int do_open(struct nameidata *nd,
 		   struct file *file, const struct open_flags *op)
@@ -3697,6 +3702,7 @@ static int do_o_path(struct nameidata *nd, unsigned flags, struct file *file)
 	return error;
 }
 
+// 先查找目标文件的父目录，并打开目标文件
 static struct file *path_openat(struct nameidata *nd,
 			const struct open_flags *op, unsigned flags)
 {
@@ -3712,7 +3718,7 @@ static struct file *path_openat(struct nameidata *nd,
 	} else if (unlikely(file->f_flags & O_PATH)) {
 		error = do_o_path(nd, flags, file);
 	} else {
-		const char *s = path_init(nd, flags);
+		const char *s = path_init(nd, flags); // 设置查找起点
 		while (!(error = link_path_walk(s, nd)) &&
 		       (s = open_last_lookups(nd, file, op)) != NULL)
 			;
@@ -3743,6 +3749,7 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
 	int flags = op->lookup_flags;
 	struct file *filp;
 
+	// 初始化文件查找结构体
 	set_nameidata(&nd, dfd, pathname, NULL);
 	filp = path_openat(&nd, op, flags | LOOKUP_RCU);
 	if (unlikely(filp == ERR_PTR(-ECHILD)))
@@ -3783,15 +3790,15 @@ static struct dentry *filename_create(int dfd, struct filename *name,
 				      struct path *path, unsigned int lookup_flags)
 {
 	struct dentry *dentry = ERR_PTR(-EEXIST);
-	struct qstr last;
+	struct qstr last; // 预查找的终点目录项
 	bool want_dir = lookup_flags & LOOKUP_DIRECTORY;
 	unsigned int reval_flag = lookup_flags & LOOKUP_REVAL;
 	unsigned int create_flags = LOOKUP_CREATE | LOOKUP_EXCL;
-	int type;
+	int type; // 预查找的终点目录项的文件类型
 	int err2;
 	int error;
 
-	error = filename_parentat(dfd, name, reval_flag, path, &last, &type);
+	error = filename_parentat(dfd, name, reval_flag, path, &last, &type); // 查找父目录，以path返回
 	if (error)
 		return ERR_PTR(error);
 
@@ -3803,14 +3810,14 @@ static struct dentry *filename_create(int dfd, struct filename *name,
 		goto out;
 
 	/* don't fail immediately if it's r/o, at least try to report other errors */
-	err2 = mnt_want_write(path->mnt);
+	err2 = mnt_want_write(path->mnt); // 获取对mount结构体的写权限
 	/*
 	 * Do the final lookup.  Suppress 'create' if there is a trailing
-	 * '/', and a directory wasn't requested.
+	 * '/', and a directory wasn't requested. 不允许创建目录
 	 */
 	if (last.name[last.len] && !want_dir)
 		create_flags = 0;
-	inode_lock_nested(path->dentry->d_inode, I_MUTEX_PARENT);
+	inode_lock_nested(path->dentry->d_inode, I_MUTEX_PARENT); // 写者锁
 	dentry = __lookup_hash(&last, path->dentry, reval_flag | create_flags);
 	if (IS_ERR(dentry))
 		goto unlock;
@@ -3846,6 +3853,7 @@ out:
 	return dentry;
 }
 
+// 生成path结构体，并返回相应dentry
 struct dentry *kern_path_create(int dfd, const char *pathname,
 				struct path *path, unsigned int lookup_flags)
 {
@@ -4083,6 +4091,7 @@ SYSCALL_DEFINE3(mkdirat, int, dfd, const char __user *, pathname, umode_t, mode)
 	return do_mkdirat(dfd, getname(pathname), mode);
 }
 
+// mkdir系统调用
 SYSCALL_DEFINE2(mkdir, const char __user *, pathname, umode_t, mode)
 {
 	return do_mkdirat(AT_FDCWD, getname(pathname), mode);
