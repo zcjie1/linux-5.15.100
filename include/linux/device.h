@@ -553,7 +553,7 @@ struct device {
 	spinlock_t		devres_lock;
 	struct list_head	devres_head;
 
-	struct class		*class;
+	struct class		*class; // device类型
 	const struct attribute_group **groups;	/* optional groups */
 
 	void	(*release)(struct device *dev);

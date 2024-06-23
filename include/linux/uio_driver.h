@@ -69,11 +69,11 @@ struct uio_port {
 struct uio_device {
 	struct module           *owner;
 	struct device		dev;
-	int                     minor;
-	atomic_t                event;
+	int                     minor; // uio次设备号
+	atomic_t                event; // 中断事件计数，初始化为0
 	struct fasync_struct    *async_queue;
 	wait_queue_head_t       wait;
-	struct uio_info         *info;
+	struct uio_info         *info; // 用户注册的uio设备信息
 	struct mutex		info_lock;
 	struct kobject          *map_dir;
 	struct kobject          *portio_dir;
@@ -104,8 +104,11 @@ struct uio_info {
 	long			irq;
 	unsigned long		irq_flags;
 	void			*priv;
-	irqreturn_t (*handler)(int irq, struct uio_info *dev_info);
-	int (*mmap)(struct uio_info *info, struct vm_area_struct *vma);
+	irqreturn_t (*handler)(int irq, struct uio_info *dev_info); // 中断处理函数
+
+	/* 对应字符设备文件的file_operation */
+
+	int (*mmap)(struct uio_info *info, struct vm_area_struct *vma); // uio设备内存映射
 	int (*open)(struct uio_info *info, struct inode *inode);
 	int (*release)(struct uio_info *info, struct inode *inode);
 	int (*irqcontrol)(struct uio_info *info, s32 irq_on);

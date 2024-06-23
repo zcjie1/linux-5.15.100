@@ -825,6 +825,7 @@ static const struct file_operations uio_fops = {
 	.llseek		= noop_llseek,
 };
 
+// 分配uio主设备号并初始化cdev管理结构
 static int uio_major_init(void)
 {
 	static const char name[] = "uio";
@@ -832,24 +833,27 @@ static int uio_major_init(void)
 	dev_t uio_dev = 0;
 	int result;
 
+	// 分配主设备号
 	result = alloc_chrdev_region(&uio_dev, 0, UIO_MAX_DEVICES, name);
 	if (result)
 		goto out;
 
 	result = -ENOMEM;
-	cdev = cdev_alloc();
+	cdev = cdev_alloc(); // 分配cdev字符设备结构体
 	if (!cdev)
 		goto out_unregister;
 
+	// cdev初始化
 	cdev->owner = THIS_MODULE;
 	cdev->ops = &uio_fops;
 	kobject_set_name(&cdev->kobj, "%s", name);
 
+	// 将字符设备加入内核全局管理
 	result = cdev_add(cdev, uio_dev, UIO_MAX_DEVICES);
 	if (result)
 		goto out_put;
 
-	uio_major = MAJOR(uio_dev);
+	uio_major = MAJOR(uio_dev); // 主设备号
 	uio_cdev = cdev;
 	return 0;
 out_put:
@@ -866,6 +870,7 @@ static void uio_major_cleanup(void)
 	cdev_del(uio_cdev);
 }
 
+// uio模块初始化
 static int init_uio_class(void)
 {
 	int ret;
@@ -875,6 +880,7 @@ static int init_uio_class(void)
 	if (ret)
 		goto exit;
 
+	// 注册uio驱动类型
 	ret = class_register(&uio_class);
 	if (ret) {
 		printk(KERN_ERR "class_register failed for uio\n");
@@ -928,23 +934,27 @@ int __uio_register_device(struct module *owner,
 
 	info->uio_dev = NULL;
 
+	// 分配uio_device
 	idev = kzalloc(sizeof(*idev), GFP_KERNEL);
 	if (!idev) {
 		return -ENOMEM;
 	}
 
+	// uio_device初始化
 	idev->owner = owner;
 	idev->info = info;
 	mutex_init(&idev->info_lock);
 	init_waitqueue_head(&idev->wait);
 	atomic_set(&idev->event, 0);
 
+	// 分配次设备号
 	ret = uio_get_minor(idev);
 	if (ret) {
 		kfree(idev);
 		return ret;
 	}
 
+	// 分配device并初始化
 	device_initialize(&idev->dev);
 	idev->dev.devt = MKDEV(uio_major, idev->minor);
 	idev->dev.class = &uio_class;
@@ -966,6 +976,7 @@ int __uio_register_device(struct module *owner,
 
 	info->uio_dev = idev;
 
+	// 注册中断号和中断处理函数
 	if (info->irq && (info->irq != UIO_IRQ_CUSTOM)) {
 		/*
 		 * Note that we deliberately don't use devm_request_irq
@@ -1070,6 +1081,7 @@ void uio_unregister_device(struct uio_info *info)
 }
 EXPORT_SYMBOL_GPL(uio_unregister_device);
 
+// uio模块初始化
 static int __init uio_init(void)
 {
 	return init_uio_class();
