@@ -800,10 +800,12 @@ struct platform_device *platform_device_register_full(
 	int ret;
 	struct platform_device *pdev;
 
+	// 分配platform device内存
 	pdev = platform_device_alloc(pdevinfo->name, pdevinfo->id);
 	if (!pdev)
 		return ERR_PTR(-ENOMEM);
 
+	// 初始化
 	pdev->dev.parent = pdevinfo->parent;
 	pdev->dev.fwnode = pdevinfo->fwnode;
 	pdev->dev.of_node = of_node_get(to_of_node(pdev->dev.fwnode));
@@ -815,11 +817,13 @@ struct platform_device *platform_device_register_full(
 		pdev->dev.coherent_dma_mask = pdevinfo->dma_mask;
 	}
 
+	// 分配资源
 	ret = platform_device_add_resources(pdev,
 			pdevinfo->res, pdevinfo->num_res);
 	if (ret)
 		goto err;
 
+	// 填充platform-specific数据
 	ret = platform_device_add_data(pdev,
 			pdevinfo->data, pdevinfo->size_data);
 	if (ret)

@@ -123,6 +123,7 @@ static inline struct platform_device *platform_device_register_resndata(
 		const struct resource *res, unsigned int num,
 		const void *data, size_t size) {
 
+	// 初始化platform_device信息		
 	struct platform_device_info pdevinfo = {
 		.parent = parent,
 		.name = name,
@@ -134,6 +135,7 @@ static inline struct platform_device *platform_device_register_resndata(
 		.dma_mask = 0,
 	};
 
+	// 注册platform device
 	return platform_device_register_full(&pdevinfo);
 }
 
