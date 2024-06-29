@@ -28,13 +28,13 @@
 #include <linux/workqueue.h>
 #include <linux/uidgid.h>
 
-#define UEVENT_HELPER_PATH_LEN		256
+#define UEVENT_HELPER_PATH_LEN		256 /* 用户空间可执行程序路径长度 */
 #define UEVENT_NUM_ENVP			64	/* number of env pointers */
 #define UEVENT_BUFFER_SIZE		2048	/* buffer for the variables */
 
 #ifdef CONFIG_UEVENT_HELPER
 /* path to the userspace helper executed on an event */
-extern char uevent_helper[];
+extern char uevent_helper[]; // 用户空间可执行程序(uevent通过kmod调用)
 #endif
 
 /* counter to tag the uevent, read only except for the kobject core */
@@ -49,16 +49,18 @@ extern u64 uevent_seqnum;
  * or device specific properties. In most cases you want to send a
  * kobject_uevent_env(kobj, KOBJ_CHANGE, env) with additional event
  * specific variables added to the event environment.
+ * 
+ * uevent消息类型
  */
 enum kobject_action {
-	KOBJ_ADD,
-	KOBJ_REMOVE,
-	KOBJ_CHANGE,
-	KOBJ_MOVE,
-	KOBJ_ONLINE,
-	KOBJ_OFFLINE,
-	KOBJ_BIND,
-	KOBJ_UNBIND,
+	KOBJ_ADD, 		// 设备增加
+	KOBJ_REMOVE,	// 设备移除
+	KOBJ_CHANGE,	// 设备属性或内容更改
+	KOBJ_MOVE,		// 设备更改name或Parent kobject
+	KOBJ_ONLINE,	// 使能已添加的设备
+	KOBJ_OFFLINE,	// 禁用设备(但并未移除，可以再次使能)
+	KOBJ_BIND,		// 设备与驱动程序绑定
+	KOBJ_UNBIND,	// 设备与驱动程序解除绑定
 };
 
 // kernel object
@@ -147,11 +149,15 @@ struct kobj_type {
 	void (*get_ownership)(struct kobject *kobj, kuid_t *uid, kgid_t *gid);
 };
 
+/**
+ * 利用Kmod向用户空间上报event事件时, 会直接执行用户空间的可执行文件
+ * 可执行文件依赖的环境变量
+*/
 struct kobj_uevent_env {
 	char *argv[3];
-	char *envp[UEVENT_NUM_ENVP];
-	int envp_idx;
-	char buf[UEVENT_BUFFER_SIZE];
+	char *envp[UEVENT_NUM_ENVP]; // 指针数组，用于保存每个环境变量的地址
+	int envp_idx; // 用于访问环境变量指针数组的index
+	char buf[UEVENT_BUFFER_SIZE]; // 保存环境变量的buffer
 	int buflen;
 };
 

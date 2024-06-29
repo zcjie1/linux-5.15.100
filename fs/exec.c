@@ -1940,6 +1940,8 @@ static int do_execveat_common(int fd, struct filename *filename,
 		goto out_free;
 	bprm->exec = bprm->p;
 
+	/* 将环境变量和参数拷贝到新进程的栈中 */
+
 	retval = copy_strings(bprm->envc, envp, bprm);
 	if (retval < 0)
 		goto out_free;
@@ -2103,6 +2105,7 @@ void set_dumpable(struct mm_struct *mm, int value)
 	set_mask_bits(&mm->flags, MMF_DUMPABLE_MASK, value);
 }
 
+// execve系统调用
 SYSCALL_DEFINE3(execve,
 		const char __user *, filename,
 		const char __user *const __user *, argv,

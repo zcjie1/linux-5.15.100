@@ -11,8 +11,9 @@ struct filename;
 
 #define CORENAME_MAX_SIZE 128
 
-/*
+/**
  * This structure is used to hold the arguments that are used when loading binaries.
+ * binprm = bin program(二进制可执行文件)
  */
 struct linux_binprm {
 #ifdef CONFIG_MMU
@@ -23,7 +24,7 @@ struct linux_binprm {
 	struct page *page[MAX_ARG_PAGES];
 #endif
 	struct mm_struct *mm;
-	unsigned long p; /* current top of mem */
+	unsigned long p; /* current top of mem 新进程的程序段顶部(vma_end) */
 	unsigned long argmin; /* rlimit marker for copy_strings() */
 	unsigned int
 		/* Should an execfd be passed to userspace? */
@@ -47,11 +48,11 @@ struct linux_binprm {
 #endif
 	struct file *executable; /* Executable to pass to the interpreter */
 	struct file *interpreter; // 解释器文件
-	struct file *file; // 当前进程的执行文件？
+	struct file *file; // 当前进程的执行文件?
 	struct cred *cred;	/* new credentials */
 	int unsafe;		/* how unsafe this exec is (mask of LSM_UNSAFE_*) */
 	unsigned int per_clear;	/* bits to clear in current->personality */
-	int argc, envc;
+	int argc, envc; // 参数数量，环境变量数量
 	const char *filename;	/* Name of binary as seen by procps */
 	const char *interp;	/* Name of the binary really executed. Most
 				   of the time same as filename, but could be
