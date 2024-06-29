@@ -36,7 +36,10 @@ const void *kobject_namespace(struct kobject *kobj)
 }
 
 /**
- * kobject_get_ownership() - Get sysfs ownership data for @kobj.
+ * kobject_get_ownership() - Get sysfs ownership data for kobj——
+ * 
+ * 获取kobject的uid和gid
+ * 
  * @kobj: kobject in question
  * @uid: kernel user ID for sysfs objects
  * @gid: kernel group ID for sysfs objects
@@ -70,6 +73,7 @@ static int populate_dir(struct kobject *kobj)
 	int error = 0;
 	int i;
 
+	// 为目录项默认属性创建sysfs文件
 	if (t && t->default_attrs) {
 		for (i = 0; (attr = t->default_attrs[i]) != NULL; i++) {
 			error = sysfs_create_file(kobj, attr);
@@ -92,13 +96,14 @@ static int create_dir(struct kobject *kobj)
 	if (error)
 		return error;
 
-	// 初始化目录节点
+	// 初始化目录节点(为目录的默认属性创建文件)
 	error = populate_dir(kobj);
 	if (error) {
 		sysfs_remove_dir(kobj);
 		return error;
 	}
 
+	// 设置属性组文件，将属性文件归档到同一个子文件夹下
 	if (ktype) {
 		error = sysfs_create_groups(kobj, ktype->default_groups);
 		if (error) {
@@ -118,6 +123,8 @@ static int create_dir(struct kobject *kobj)
 	/*
 	 * If @kobj has ns_ops, its children need to be filtered based on
 	 * their namespace tags.  Enable namespace support on @kobj->sd.
+	 * 
+	 * 使能kobject对应的kernfs_node中的namespace tag
 	 */
 	ops = kobj_child_ns_ops(kobj);
 	if (ops) {
@@ -204,7 +211,7 @@ static void kobj_kset_join(struct kobject *kobj)
 	if (!kobj->kset)
 		return;
 
-	kset_get(kobj->kset);
+	kset_get(kobj->kset); // 增加kset引用计数
 	spin_lock(&kobj->kset->list_lock);
 	list_add_tail(&kobj->entry, &kobj->kset->list);
 	spin_unlock(&kobj->kset->list_lock);
@@ -233,7 +240,7 @@ static void kobject_init_internal(struct kobject *kobj)
 
 	INIT_LIST_HEAD(&kobj->entry);
 
-	/* 初始化kobject所处状态 */
+	/* 初始化kobject状态 */
 
 	kobj->state_in_sysfs = 0;
 	kobj->state_add_uevent_sent = 0;
@@ -259,13 +266,13 @@ static int kobject_add_internal(struct kobject *kobj)
 		return -EINVAL;
 	}
 
-	// 若kobj的父kobject存在，增加kobject的引用计数
+	// 若kobj的父kobject存在，增加父kobject的引用计数
 	parent = kobject_get(kobj->parent);
 
 	/* join kset if set, use it as parent if we do not already have one */
 	if (kobj->kset) {
 		if (!parent)
-			parent = kobject_get(&kobj->kset->kobj);
+			parent = kobject_get(&kobj->kset->kobj); // 将parent设置为kset的kobject
 		kobj_kset_join(kobj);
 		kobj->parent = parent;
 	}
@@ -307,9 +314,11 @@ int kobject_set_name_vargs(struct kobject *kobj, const char *fmt,
 {
 	const char *s;
 
+	// 若name已初始化
 	if (kobj->name && !fmt)
 		return 0;
 
+	// 拷贝name
 	s = kvasprintf_const(GFP_KERNEL, fmt, vargs);
 	if (!s)
 		return -ENOMEM;
@@ -319,6 +328,8 @@ int kobject_set_name_vargs(struct kobject *kobj, const char *fmt,
 	 * that's the case, we need to make sure we have an actual
 	 * allocated copy to modify, since kvasprintf_const may have
 	 * returned something from .rodata.
+	 * 
+	 * 用'!'替代目录项中的'/'
 	 */
 	if (strchr(s, '/')) {
 		char *t;
@@ -359,7 +370,7 @@ int kobject_set_name(struct kobject *kobj, const char *fmt, ...)
 EXPORT_SYMBOL(kobject_set_name);
 
 /**
- * kobject_init() - Initialize a kobject structure.
+ * kobject_init() - Initialize a kobject structure——初始化kobject
  * @kobj: pointer to the kobject to initialize
  * @ktype: pointer to the ktype for this kobject.
  *
@@ -425,7 +436,10 @@ static __printf(3, 0) int kobject_add_varg(struct kobject *kobj,
 }
 
 /**
- * kobject_add() - The main kobject add function.
+ * kobject_add() - The main kobject add function——
+ * 
+ * 将kobject加入sysfs中，创建对应目录项
+ * 
  * @kobj: the kobject to add
  * @parent: pointer to the parent of the kobject.
  * @fmt: format to name the kobject with.
@@ -644,10 +658,14 @@ static void __kobject_del(struct kobject *kobj)
 	sd = kobj->sd;
 	ktype = get_ktype(kobj);
 
+	// 清除属性文件group
 	if (ktype)
 		sysfs_remove_groups(kobj, ktype->default_groups);
 
-	/* send "remove" if the caller did not do it but sent "add" */
+	/**
+	 * send "remove" if the caller did not do it but sent "add"
+	 * 如果该kobject向用户空间发送了ADD uevent但没有发送REMOVE uevent，补发REMOVE uevent
+	 */
 	if (kobj->state_add_uevent_sent && !kobj->state_remove_uevent_sent) {
 		pr_debug("kobject: '%s' (%p): auto cleanup 'remove' event\n",
 			 kobject_name(kobj), kobj);
@@ -723,6 +741,7 @@ static void kobject_cleanup(struct kobject *kobj)
 	pr_debug("kobject: '%s' (%p): %s, parent %p\n",
 		 kobject_name(kobj), kobj, __func__, kobj->parent);
 
+	// 若kobject未注册release函数，警告
 	if (t && !t->release)
 		pr_debug("kobject: '%s' (%p): does not have a release() function, it is broken and must be fixed. See Documentation/core-api/kobject.rst.\n",
 			 kobject_name(kobj), kobj);
@@ -731,25 +750,26 @@ static void kobject_cleanup(struct kobject *kobj)
 	if (kobj->state_in_sysfs) {
 		pr_debug("kobject: '%s' (%p): auto cleanup kobject_del\n",
 			 kobject_name(kobj), kobj);
-		__kobject_del(kobj);
+		__kobject_del(kobj); // 在sysfs中注销kobject
 	} else {
 		/* avoid dropping the parent reference unnecessarily */
 		parent = NULL;
 	}
 
+	// 调用kobj_type中的release，清除kobject所在的外壳结构体资源
 	if (t && t->release) {
 		pr_debug("kobject: '%s' (%p): calling ktype release\n",
 			 kobject_name(kobj), kobj);
 		t->release(kobj);
 	}
 
-	/* free name if we allocated it */
+	/* free name if we allocated it——清除name的内存分配 */
 	if (name) {
 		pr_debug("kobject: '%s': free name\n", name);
 		kfree_const(name);
 	}
 
-	kobject_put(parent);
+	kobject_put(parent); // 清除当前kobject的parent的引用计数
 }
 
 #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
@@ -866,7 +886,9 @@ struct kobject *kobject_create_and_add(const char *name, struct kobject *parent)
 EXPORT_SYMBOL_GPL(kobject_create_and_add);
 
 /**
- * kset_init() - Initialize a kset for use.
+ * kset_init() - Initialize a kset for use——
+ * 上层程序必须初始化kset->kobj的ktype
+ * 
  * @k: kset
  */
 void kset_init(struct kset *k)
@@ -908,7 +930,8 @@ const struct sysfs_ops kobj_sysfs_ops = {
 EXPORT_SYMBOL_GPL(kobj_sysfs_ops);
 
 /**
- * kset_register() - Initialize and add a kset.
+ * kset_register() - Initialize and add a kset——
+ * 先调用kset_init，再将kset加入内核管理链表中
  * @k: kset.
  */
 int kset_register(struct kset *k)
@@ -935,8 +958,8 @@ void kset_unregister(struct kset *k)
 {
 	if (!k)
 		return;
-	kobject_del(&k->kobj);
-	kobject_put(&k->kobj);
+	kobject_del(&k->kobj); // kobject_add的反操作
+	kobject_put(&k->kobj); // kobject_get的反操作
 }
 EXPORT_SYMBOL(kset_unregister);
 

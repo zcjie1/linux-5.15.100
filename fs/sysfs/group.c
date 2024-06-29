@@ -198,6 +198,9 @@ static int internal_create_groups(struct kobject *kobj, int update,
 
 /**
  * sysfs_create_groups - given a directory kobject, create a bunch of attribute groups
+ * 
+ * ——设置属性组文件，将属性文件归档到同一个文件夹下
+ * 
  * @kobj:	The kobject to create the group on
  * @groups:	The attribute groups to create, NULL terminated
  *

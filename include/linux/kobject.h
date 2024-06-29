@@ -61,12 +61,13 @@ enum kobject_action {
 	KOBJ_UNBIND,
 };
 
+// kernel object
 struct kobject {
 	const char		*name; // 对象的文本名称，可通过sd导出至用户空间
 	struct list_head	entry; // 连接当前所在kset中的其他kobject
 	struct kobject		*parent; // 父kobject(详情见kobject_add函数注释)
 	struct kset		*kset; // 标明所属的kobject集合
-	struct kobj_type	*ktype; // 更多有关kobject的信息，如释放结构体的析构函数
+	struct kobj_type	*ktype; // kobject的属性操作集合，如释放结构体的析构函数
 	struct kernfs_node	*sd; /* sysfs directory entry */
 	struct kref		kref; // 引用计数(初始化为1)
 #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
@@ -135,12 +136,13 @@ static inline bool kobject_has_children(struct kobject *kobj)
 	return kobj->sd && kobj->sd->dir.subdirs;
 }
 
+// kobject的属性操作集合
 struct kobj_type {
 	void (*release)(struct kobject *kobj); // 释放kobject
 	const struct sysfs_ops *sysfs_ops; // 比如kobj_sysfs_ops
 	struct attribute **default_attrs;	/* use default_groups instead */
 	const struct attribute_group **default_groups;
-	const struct kobj_ns_type_operations *(*child_ns_type)(struct kobject *kobj);
+	const struct kobj_ns_type_operations *(*child_ns_type)(struct kobject *kobj); // kobject命名空间相关操作
 	const void *(*namespace)(struct kobject *kobj);
 	void (*get_ownership)(struct kobject *kobj, kuid_t *uid, kgid_t *gid);
 };
@@ -174,7 +176,7 @@ struct sock;
 
 /**
  * struct kset - a set of kobjects of a specific type, belonging to a specific subsystem.
- *
+ * 
  * A kset defines a group of kobjects.  They can be individually
  * different "types" but overall these kobjects all want to be grouped
  * together and operated on in the same manner.  ksets are used to
@@ -190,9 +192,9 @@ struct sock;
  * desired.
  */
 struct kset {
-	struct list_head list;
+	struct list_head list; // kobject链表的链表头
 	spinlock_t list_lock;
-	struct kobject kobj;
+	struct kobject kobj; // 代表kset自身的kobject
 	const struct kset_uevent_ops *uevent_ops;
 } __randomize_layout;
 

@@ -147,12 +147,12 @@ struct kernfs_node {
 
 	struct rb_node		rb; // 红黑树节点
 
-	const void		*ns;	/* namespace tag */
+	const void		*ns;	/* namespace tag 不同命名空间看到不同的sysfs目录项 */
 	unsigned int		hash;	/* ns + name hash */
 	union {
 		struct kernfs_elem_dir		dir;
 		struct kernfs_elem_symlink	symlink;
-		struct kernfs_elem_attr		attr;
+		struct kernfs_elem_attr		attr; // 包含文件的操作函数
 	};
 
 	/**

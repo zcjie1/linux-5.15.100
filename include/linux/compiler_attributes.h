@@ -147,8 +147,8 @@
 # define __visible
 #endif
 
-/*
- *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-format-function-attribute
+/* 第a, b个参数与printf相匹配
+ * gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-format-function-attribute
  * clang: https://clang.llvm.org/docs/AttributeReference.html#format
  */
 #define __printf(a, b)                  __attribute__((__format__(printf, a, b)))

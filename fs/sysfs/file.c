@@ -254,6 +254,7 @@ static const struct kernfs_ops sysfs_bin_kfops_mmap = {
 	.open		= sysfs_kf_bin_open,
 };
 
+// sysfs创建文件核心函数
 int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 			   const struct attribute *attr, bool is_bin,
 			   umode_t mode, kuid_t uid, kgid_t gid, const void *ns)
@@ -263,6 +264,7 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 	struct kernfs_node *kn;
 	loff_t size;
 
+	// 若不是bin文件
 	if (!is_bin) {
 		struct kobject *kobj = parent->priv;
 		const struct sysfs_ops *sysfs_ops = kobj->ktype->sysfs_ops;
@@ -272,6 +274,8 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 			 "missing sysfs attribute operations for kobject: %s\n",
 			 kobject_name(kobj)))
 			return -EINVAL;
+
+		/* 分配待创建file对应的kernfs_ops */
 
 		if (sysfs_ops->show && sysfs_ops->store) {
 			if (mode & SYSFS_PREALLOC)
@@ -292,7 +296,7 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 			ops = &sysfs_file_kfops_empty;
 
 		size = PAGE_SIZE;
-	} else {
+	} else { // 若为bin文件(暂时不清楚什么作用)
 		struct bin_attribute *battr = (void *)attr;
 
 		if (battr->mmap)
@@ -314,6 +318,7 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 		key = attr->key ?: (struct lock_class_key *)&attr->skey;
 #endif
 
+	// kernfs文件系统中创建文件的核心函数
 	kn = __kernfs_create_file(parent, attr->name, mode & 0777, uid, gid,
 				  size, ops, (void *)attr, ns, key);
 	if (IS_ERR(kn)) {
@@ -339,7 +344,10 @@ int sysfs_create_file_ns(struct kobject *kobj, const struct attribute *attr,
 	if (WARN_ON(!kobj || !kobj->sd || !attr))
 		return -EINVAL;
 
+	// 获取uid和gid
 	kobject_get_ownership(kobj, &uid, &gid);
+
+	// sysfs创建文件核心函数
 	return sysfs_add_file_mode_ns(kobj->sd, attr, false, attr->mode,
 				      uid, gid, ns);
 

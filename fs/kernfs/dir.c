@@ -652,6 +652,7 @@ static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
 	return NULL;
 }
 
+// 创建kernfs_node并初始化父节点
 struct kernfs_node *kernfs_new_node(struct kernfs_node *parent,
 				    const char *name, umode_t mode,
 				    kuid_t uid, kgid_t gid,

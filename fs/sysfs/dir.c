@@ -33,7 +33,7 @@ void sysfs_warn_dup(struct kernfs_node *parent, const char *name)
 }
 
 /**
- * sysfs_create_dir_ns - create a directory for an object with a namespace tag
+ * sysfs_create_dir_ns - create a directory for an kobject with a namespace tag
  * @kobj: object we're creating directory for
  * @ns: the namespace tag to use
  */
@@ -50,11 +50,12 @@ int sysfs_create_dir_ns(struct kobject *kobj, const void *ns)
 	if (kobj->parent)
 		parent = kobj->parent->sd;
 	else
-		parent = sysfs_root_kn;
+		parent = sysfs_root_kn; // 根目录
 
 	if (!parent)
 		return -ENOENT;
 
+	// 获取kobject的uid和gid
 	kobject_get_ownership(kobj, &uid, &gid);
 
 	// 为kobj创建sysfs目录

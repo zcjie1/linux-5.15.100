@@ -27,6 +27,7 @@ struct module;
 struct bin_attribute;
 enum kobj_ns_type;
 
+// kobject属性，对应sysfs目录项中的文件
 struct attribute {
 	const char		*name;
 	umode_t			mode;
@@ -601,6 +602,7 @@ static inline int sysfs_emit_at(char *buf, int at, const char *fmt, ...)
 }
 #endif /* CONFIG_SYSFS */
 
+// 在sysfs文件系统中创建属性文件
 static inline int __must_check sysfs_create_file(struct kobject *kobj,
 						 const struct attribute *attr)
 {

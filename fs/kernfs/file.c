@@ -987,6 +987,7 @@ struct kernfs_node *__kernfs_create_file(struct kernfs_node *parent,
 	if (!kn)
 		return ERR_PTR(-ENOMEM);
 
+	// 初始化kernfs_node
 	kn->attr.ops = ops;
 	kn->attr.size = size;
 	kn->ns = ns;
@@ -1003,6 +1004,8 @@ struct kernfs_node *__kernfs_create_file(struct kernfs_node *parent,
 	 * kn->attr.ops is accesible only while holding active ref.  We
 	 * need to know whether some ops are implemented outside active
 	 * ref.  Cache their existence in flags.
+	 * 
+	 * 标志位初始化
 	 */
 	if (ops->seq_show)
 		kn->flags |= KERNFS_HAS_SEQ_SHOW;
@@ -1011,6 +1014,7 @@ struct kernfs_node *__kernfs_create_file(struct kernfs_node *parent,
 	if (ops->release)
 		kn->flags |= KERNFS_HAS_RELEASE;
 
+	// 将knerfs_node加入文件树中
 	rc = kernfs_add_one(kn);
 	if (rc) {
 		kernfs_put(kn);
