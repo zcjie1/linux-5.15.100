@@ -233,6 +233,7 @@ out:
 }
 
 #ifdef CONFIG_UEVENT_HELPER
+// kobj属于初始命名空间返回0，否则返回1
 static int kobj_usermode_filter(struct kobject *kobj)
 {
 	const struct kobj_ns_type_operations *ops;
@@ -423,6 +424,7 @@ static void zap_modalias_env(struct kobj_uevent_env *env)
 	int i, j;
 
 	for (i = 0; i < env->envp_idx;) {
+		// 若与modalias_prefix不相等，continue
 		if (strncmp(env->envp[i], modalias_prefix,
 			    sizeof(modalias_prefix) - 1)) {
 			i++;
@@ -477,11 +479,15 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 	pr_debug("kobject: '%s' (%p): %s\n",
 		 kobject_name(kobj), kobj, __func__);
 
-	/* search the kset we belong to */
+	/** 
+	 * search the kset we belong to
+	 * 查看kobject(或其祖先)是否属于某个kset 
+	 */
 	top_kobj = kobj;
 	while (!top_kobj->kset && top_kobj->parent)
 		top_kobj = top_kobj->parent;
 
+	// 若不属于某个kset，警告并返回失败
 	if (!top_kobj->kset) {
 		pr_debug("kobject: '%s' (%p): %s: attempted to send uevent "
 			 "without kset!\n", kobject_name(kobj), kobj,
@@ -508,7 +514,7 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 			return 0;
 		}
 
-	/* originating subsystem */
+	/* originating subsystem —— 获取子系统的name，即kset或kobj的目录名 */
 	if (uevent_ops && uevent_ops->name)
 		subsystem = uevent_ops->name(kset, kobj);
 	else
@@ -520,19 +526,19 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 		return 0;
 	}
 
-	/* environment buffer */
+	/* environment buffer —— uevent环境变量内存分配 */
 	env = kzalloc(sizeof(struct kobj_uevent_env), GFP_KERNEL);
 	if (!env)
 		return -ENOMEM;
 
-	/* complete object path */
+	/* complete object path —— 获取kobject的路径 */
 	devpath = kobject_get_path(kobj, GFP_KERNEL);
 	if (!devpath) {
 		retval = -ENOENT;
 		goto exit;
 	}
 
-	/* default keys */
+	/* default keys —— 初始化环境变量 */
 	retval = add_uevent_var(env, "ACTION=%s", action_string);
 	if (retval)
 		goto exit;
@@ -543,7 +549,7 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 	if (retval)
 		goto exit;
 
-	/* keys passed in from the caller */
+	/* keys passed in from the caller —— 添加调用者传入的环境变量 */
 	if (envp_ext) {
 		for (i = 0; envp_ext[i]; i++) {
 			retval = add_uevent_var(env, "%s", envp_ext[i]);
@@ -552,7 +558,7 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 		}
 	}
 
-	/* let the kset specific function add its stuff */
+	/* let the kset specific function add its stuff —— 添加kset统一环境变量 */
 	if (uevent_ops && uevent_ops->uevent) {
 		retval = uevent_ops->uevent(kset, kobj, env);
 		if (retval) {
@@ -576,7 +582,7 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 		break;
 
 	case KOBJ_UNBIND:
-		zap_modalias_env(env);
+		zap_modalias_env(env); // 清除环境变量中的模块别名
 		break;
 
 	default:
@@ -584,12 +590,14 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 	}
 
 	mutex_lock(&uevent_sock_mutex);
-	/* we will send an event, so request a new sequence number */
+	/* we will send an event, so request a new sequence number —— 添加序列号环境变量 */
 	retval = add_uevent_var(env, "SEQNUM=%llu", ++uevent_seqnum);
 	if (retval) {
 		mutex_unlock(&uevent_sock_mutex);
 		goto exit;
 	}
+
+	// 若定义了CONFIG_NET, 通过Netlink发送uevent消息
 	retval = kobject_uevent_net_broadcast(kobj, env, action_string,
 					      devpath);
 	mutex_unlock(&uevent_sock_mutex);
@@ -599,16 +607,23 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 	if (uevent_helper[0] && !kobj_usermode_filter(kobj)) {
 		struct subprocess_info *info;
 
+		// 添加HOME环境变量
 		retval = add_uevent_var(env, "HOME=/");
 		if (retval)
 			goto exit;
+		
+		// 添加PATH环境变量
 		retval = add_uevent_var(env,
 					"PATH=/sbin:/bin:/usr/sbin:/usr/bin");
 		if (retval)
 			goto exit;
+		
+		// 初始化env的argv变量
 		retval = init_uevent_argv(env, subsystem);
 		if (retval)
 			goto exit;
+
+		/* 通过kmod发送uevent消息 */
 
 		retval = -ENOMEM;
 		info = call_usermodehelper_setup(env->argv[0], env->argv,

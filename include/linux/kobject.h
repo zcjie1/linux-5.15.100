@@ -59,8 +59,8 @@ enum kobject_action {
 	KOBJ_MOVE,		// 设备更改name或Parent kobject
 	KOBJ_ONLINE,	// 使能已添加的设备
 	KOBJ_OFFLINE,	// 禁用设备(但并未移除，可以再次使能)
-	KOBJ_BIND,		// 设备与驱动程序绑定
-	KOBJ_UNBIND,	// 设备与驱动程序解除绑定
+	KOBJ_BIND,		// 设备与驱动程序绑定(设置别名)
+	KOBJ_UNBIND,	// 设备与驱动程序解除绑定(清除别名)
 };
 
 // kernel object
@@ -79,7 +79,7 @@ struct kobject {
 	unsigned int state_in_sysfs:1; // 当前kobject是否处在sysfs管理中
 	unsigned int state_add_uevent_sent:1;
 	unsigned int state_remove_uevent_sent:1;
-	unsigned int uevent_suppress:1;
+	unsigned int uevent_suppress:1; // 抑制uevent事件发送
 };
 
 extern __printf(2, 3)
@@ -161,13 +161,20 @@ struct kobj_uevent_env {
 	int buflen;
 };
 
+// kset专有的的uevent操作函数
 struct kset_uevent_ops {
+	// 当Kobject上报uevent时，它所属的kset可以通过filter函数过滤
 	int (* const filter)(struct kset *kset, struct kobject *kobj);
+
+	// 返回kset的name，若不存在合法name，则所管理的kobject不允许上报uevent
 	const char *(* const name)(struct kset *kset, struct kobject *kobj);
+
+	// 为所管理的kobject上报的uevent统一增加环境变量
 	int (* const uevent)(struct kset *kset, struct kobject *kobj,
 		      struct kobj_uevent_env *env);
 };
 
+// kobject的属性及其操作函数
 struct kobj_attribute {
 	struct attribute attr;
 	ssize_t (*show)(struct kobject *kobj, struct kobj_attribute *attr,
