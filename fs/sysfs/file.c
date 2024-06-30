@@ -296,7 +296,7 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 			ops = &sysfs_file_kfops_empty;
 
 		size = PAGE_SIZE;
-	} else { // 若为bin文件(暂时不清楚什么作用)
+	} else { // 若为bin文件
 		struct bin_attribute *battr = (void *)attr;
 
 		if (battr->mmap)
