@@ -2023,7 +2023,6 @@ static const char *walk_component(struct nameidata *nd, int flags)
 		return handle_dots(nd, nd->last_type);
 	}
 
-	// 在内存当前的
 	dentry = lookup_fast(nd, &inode, &seq);
 	if (IS_ERR(dentry))
 		return ERR_CAST(dentry);
@@ -3477,7 +3476,7 @@ static const char *open_last_lookups(struct nameidata *nd,
 	}
 
 	if (!(open_flag & O_CREAT)) {
-		if (nd->last.name[nd->last.len])
+		if (nd->last.name[nd->last.len]) // 若元素的最后一个字符不为空
 			nd->flags |= LOOKUP_FOLLOW | LOOKUP_DIRECTORY;
 		/* we _can_ be in RCU mode here */
 		dentry = lookup_fast(nd, &inode, &seq);

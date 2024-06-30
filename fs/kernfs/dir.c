@@ -1140,6 +1140,7 @@ static struct dentry *kernfs_iop_lookup(struct inode *dir,
 	if (kernfs_ns_enabled(parent))
 		ns = kernfs_info(dir->i_sb)->ns;
 
+	// 查询kernfs_node
 	kn = kernfs_find_ns(parent, dentry->d_name.name, ns);
 	/* attach dentry and inode */
 	if (kn) {
@@ -1150,7 +1151,7 @@ static struct dentry *kernfs_iop_lookup(struct inode *dir,
 			up_read(&kernfs_rwsem);
 			return NULL;
 		}
-		inode = kernfs_get_inode(dir->i_sb, kn);
+		inode = kernfs_get_inode(dir->i_sb, kn); // 为kernfs_node分配inode
 		if (!inode)
 			inode = ERR_PTR(-ENOMEM);
 	}

@@ -163,6 +163,8 @@ struct kernfs_node {
 	/*
 	 * 64bit unique ID.  On 64bit ino setups, id is the ino.  On 32bit,
 	 * the low 32bits are ino and upper generation.
+	 * 
+	 * inode ID
 	 */
 	u64			id;
 

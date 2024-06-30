@@ -233,6 +233,7 @@ struct dentry *kernfs_node_dentry(struct kernfs_node *kn,
 	} while (true);
 }
 
+// 填充超级块，生成根目录inode和dentry
 static int kernfs_fill_super(struct super_block *sb, struct kernfs_fs_context *kfc)
 {
 	struct kernfs_super_info *info = kernfs_info(sb);
@@ -328,6 +329,8 @@ int kernfs_get_tree(struct fs_context *fc)
 	INIT_LIST_HEAD(&info->node);
 
 	fc->s_fs_info = info;
+
+	// 分配kernfs对应的超级块
 	sb = sget_fc(fc, kernfs_test_super, kernfs_set_super);
 	if (IS_ERR(sb))
 		return PTR_ERR(sb);
@@ -337,6 +340,7 @@ int kernfs_get_tree(struct fs_context *fc)
 
 		kfc->new_sb_created = true;
 
+		// 填充超级块，分配dentry和inode
 		error = kernfs_fill_super(sb, kfc);
 		if (error) {
 			deactivate_locked_super(sb);
