@@ -59,7 +59,7 @@ enum kobject_action {
 	KOBJ_MOVE,		// 设备更改name或Parent kobject
 	KOBJ_ONLINE,	// 使能已添加的设备
 	KOBJ_OFFLINE,	// 禁用设备(但并未移除，可以再次使能)
-	KOBJ_BIND,		// 设备与驱动程序绑定(设置别名)
+	KOBJ_BIND,		// 设备与驱动程序绑定
 	KOBJ_UNBIND,	// 设备与驱动程序解除绑定(清除别名)
 };
 
