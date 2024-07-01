@@ -474,7 +474,7 @@ struct device {
 	struct kobject kobj;
 	struct device		*parent;
 
-	struct device_private	*p;
+	struct device_private	*p; // 各类链表节点
 
 	const char		*init_name; /* initial name of the device */
 	const struct device_type *type;
@@ -483,9 +483,9 @@ struct device {
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
 	void		*platform_data;	/* Platform specific data, device
-					   core doesn't touch it */
+					   core doesn't touch it, 可用于保存私有数据 */
 	void		*driver_data;	/* Driver data, set and get with
-					   dev_set_drvdata/dev_get_drvdata */
+					   dev_set_drvdata/dev_get_drvdata，保存driver私有数据 */
 #ifdef CONFIG_PROVE_LOCKING
 	struct mutex		lockdep_mutex;
 #endif
@@ -494,6 +494,8 @@ struct device {
 					 */
 
 	struct dev_links_info	links;
+
+	// 电源管理相关
 	struct dev_pm_info	power;
 	struct dev_pm_domain	*pm_domain;
 
@@ -553,8 +555,8 @@ struct device {
 	spinlock_t		devres_lock;
 	struct list_head	devres_head;
 
-	struct class		*class; // device类型
-	const struct attribute_group **groups;	/* optional groups */
+	struct class		*class; // device class类型
+	const struct attribute_group **groups;	/* optional groups——devie默认attribute集合 */
 
 	void	(*release)(struct device *dev);
 	struct iommu_group	*iommu_group;

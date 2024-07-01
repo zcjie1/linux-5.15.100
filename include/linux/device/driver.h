@@ -99,7 +99,7 @@ struct device_driver {
 	struct module		*owner;
 	const char		*mod_name;	/* used for built-in modules */
 
-	bool suppress_bind_attrs;	/* disables bind/unbind via sysfs */
+	bool suppress_bind_attrs;	/* disables bind/unbind via sysfs——是否允许用户空间为driver绑定设备 */
 	enum probe_type probe_type;
 
 	const struct of_device_id	*of_match_table;
@@ -108,13 +108,16 @@ struct device_driver {
 	int (*probe) (struct device *dev);
 	void (*sync_state)(struct device *dev);
 	int (*remove) (struct device *dev);
+
+	/* 电源管理相关 */
 	void (*shutdown) (struct device *dev);
 	int (*suspend) (struct device *dev, pm_message_t state);
 	int (*resume) (struct device *dev);
+	const struct dev_pm_ops *pm;
+
 	const struct attribute_group **groups;
 	const struct attribute_group **dev_groups;
 
-	const struct dev_pm_ops *pm;
 	void (*coredump) (struct device *dev);
 
 	struct driver_private *p;
