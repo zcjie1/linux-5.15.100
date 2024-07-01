@@ -176,6 +176,7 @@ static const struct kset_uevent_ops bus_uevent_ops = {
 	.filter = bus_uevent_filter,
 };
 
+// 总线bus kset
 static struct kset *bus_kset;
 
 /* Manually detach a device from its associated driver. */
@@ -552,6 +553,7 @@ static void remove_bind_files(struct device_driver *drv)
 static BUS_ATTR_WO(drivers_probe);
 static BUS_ATTR_RW(drivers_autoprobe);
 
+// 添加drivers_probe和drivers_autoprobe两个attribute文件
 static int add_probe_files(struct bus_type *bus)
 {
 	int retval;
@@ -786,31 +788,38 @@ int bus_register(struct bus_type *bus)
 	struct subsys_private *priv;
 	struct lock_class_key *key = &bus->lock_key;
 
+	// 分配subsys_private内存空间
 	priv = kzalloc(sizeof(struct subsys_private), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
+	// 建立bus与subsys_private的联系
 	priv->bus = bus;
 	bus->p = priv;
 
 	BLOCKING_INIT_NOTIFIER_HEAD(&priv->bus_notifier);
 
+	// 初始化bus_type对应kobject的name
 	retval = kobject_set_name(&priv->subsys.kobj, "%s", bus->name);
 	if (retval)
 		goto out;
 
+	// 初始化bus自身属性和操作函数
 	priv->subsys.kobj.kset = bus_kset;
 	priv->subsys.kobj.ktype = &bus_ktype;
 	priv->drivers_autoprobe = 1;
 
+	// 注册bus所管理的kset
 	retval = kset_register(&priv->subsys);
 	if (retval)
 		goto out;
 
+	// 为bus添加一个uevent attribute文件
 	retval = bus_create_file(bus, &bus_attr_uevent);
 	if (retval)
 		goto bus_uevent_fail;
 
+	// 注册device kset并加入到bus kset的管理
 	priv->devices_kset = kset_create_and_add("devices", NULL,
 						 &priv->subsys.kobj);
 	if (!priv->devices_kset) {
@@ -818,6 +827,7 @@ int bus_register(struct bus_type *bus)
 		goto bus_devices_fail;
 	}
 
+	// 注册driver kset并加入到bus kset的管理
 	priv->drivers_kset = kset_create_and_add("drivers", NULL,
 						 &priv->subsys.kobj);
 	if (!priv->drivers_kset) {
@@ -825,15 +835,18 @@ int bus_register(struct bus_type *bus)
 		goto bus_drivers_fail;
 	}
 
+	// 初始化subsys_private
 	INIT_LIST_HEAD(&priv->interfaces);
 	__mutex_init(&priv->mutex, "subsys mutex", key);
 	klist_init(&priv->klist_devices, klist_devices_get, klist_devices_put);
 	klist_init(&priv->klist_drivers, NULL, NULL);
 
+	// 添加drivers_probe和drivers_autoprobe两个attribute文件
 	retval = add_probe_files(bus);
 	if (retval)
 		goto bus_probe_files_fail;
 
+	// 添加由bus_groups指针定义的bus的默认attribute
 	retval = bus_add_groups(bus, bus->bus_groups);
 	if (retval)
 		goto bus_groups_fail;

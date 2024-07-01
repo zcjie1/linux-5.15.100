@@ -63,6 +63,8 @@ struct subsys_interface {
 	const char *name;
 	struct bus_type *subsys;
 	struct list_head node;
+
+	/* 当bus中有设备增加或删除时，会调用属于该bus的所有interface接口 */
 	int (*add_dev)(struct device *dev, struct subsys_interface *sif);
 	void (*remove_dev)(struct device *dev, struct subsys_interface *sif);
 };

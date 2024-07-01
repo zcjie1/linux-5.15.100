@@ -38,7 +38,7 @@
  * driver core should ever touch these fields.
  */
 struct subsys_private {
-	struct kset subsys;
+	struct kset subsys; // 代表包含此subsys_private的结构体自身，比如bus_type, class
 	struct kset *devices_kset;
 	struct list_head interfaces;
 	struct mutex mutex;
@@ -47,7 +47,7 @@ struct subsys_private {
 	struct klist klist_devices;
 	struct klist klist_drivers;
 	struct blocking_notifier_head bus_notifier;
-	unsigned int drivers_autoprobe:1;
+	unsigned int drivers_autoprobe:1; // 自动probe初始化为1
 	struct bus_type *bus;
 
 	struct kset glue_dirs;

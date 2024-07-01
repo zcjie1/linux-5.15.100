@@ -81,17 +81,22 @@ struct fwnode_handle;
  */
 struct bus_type {
 	const char		*name;
-	const char		*dev_name;
+	const char		*dev_name; // device name前缀(设备数量较多时，使用dev_name+dev_id构建设备名字) 
 	struct device		*dev_root;
+
+	/* 默认属性集合 */
 	const struct attribute_group **bus_groups;
 	const struct attribute_group **dev_groups;
 	const struct attribute_group **drv_groups;
 
-	int (*match)(struct device *dev, struct device_driver *drv);
-	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
+	int (*match)(struct device *dev, struct device_driver *drv); // 匹配新挂载的device火driver
+	int (*uevent)(struct device *dev, struct kobj_uevent_env *env); // 当所管理的device发生变动，发送uevent
+	
+	/* 总线自身的操作函数 */
 	int (*probe)(struct device *dev);
 	void (*sync_state)(struct device *dev);
 	void (*remove)(struct device *dev);
+
 	void (*shutdown)(struct device *dev);
 
 	int (*online)(struct device *dev);
