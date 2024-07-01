@@ -23,7 +23,7 @@ struct platform_device_id;
 struct platform_device {
 	const char	*name;
 	int		id;
-	bool		id_auto;
+	bool		id_auto; // 是否自动分配id
 	struct device	dev;
 	u64		platform_dma_mask;
 	struct device_dma_parameters dma_parms;
