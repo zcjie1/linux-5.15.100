@@ -6,5 +6,6 @@ mount -t proc none /proc
 mount -t sysfs none /sys
 mkdir /tmp
 mount -t tmpfs none /tmp
+mount -t devtmpfs devtmpfs /dev
 echo -e "\nThis boot took $(cut -d' ' -f1 /proc/uptime) seconds\n"
 exec /bin/sh
