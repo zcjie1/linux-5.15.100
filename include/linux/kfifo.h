@@ -41,12 +41,13 @@
 #include <linux/stddef.h>
 #include <linux/scatterlist.h>
 
+// KFIFO核心数据结构
 struct __kfifo {
-	unsigned int	in;
-	unsigned int	out;
-	unsigned int	mask;
-	unsigned int	esize;
-	void		*data;
+	unsigned int	in; 	// 入队指针
+	unsigned int	out;	// 出队指针
+	unsigned int	mask;	// 掩码，值为queue_size-1
+	unsigned int	esize;	// 单个数据元素的大小，单位为字节
+	void		*data;	// KFIFO队列的首地址
 };
 
 #define __STRUCT_KFIFO_COMMON(datatype, recsize, ptrtype) \
@@ -104,6 +105,9 @@ struct kfifo_rec_ptr_2 __STRUCT_KFIFO_PTR(unsigned char, 2, void);
 
 /**
  * DECLARE_KFIFO_PTR - macro to declare a fifo pointer object
+ * 
+ * kfifo队列data不存储在struct kfifo结构体中，需要用kfifo_alloc分配
+ * 
  * @fifo: name of the declared fifo
  * @type: type of the fifo elements
  */
@@ -111,6 +115,9 @@ struct kfifo_rec_ptr_2 __STRUCT_KFIFO_PTR(unsigned char, 2, void);
 
 /**
  * DECLARE_KFIFO - macro to declare a fifo object
+ * 
+ * kfifo队列data直接存储在struct kfifo结构体中
+ * 
  * @fifo: name of the declared fifo
  * @type: type of the fifo elements
  * @size: the number of elements in the fifo, this must be a power of 2
@@ -119,6 +126,9 @@ struct kfifo_rec_ptr_2 __STRUCT_KFIFO_PTR(unsigned char, 2, void);
 
 /**
  * INIT_KFIFO - Initialize a fifo declared by DECLARE_KFIFO
+ * 
+ * 初始化 struct __kfifo
+ * 
  * @fifo: name of the declared fifo datatype
  */
 #define INIT_KFIFO(fifo) \
