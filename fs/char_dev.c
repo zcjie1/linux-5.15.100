@@ -230,7 +230,7 @@ int register_chrdev_region(dev_t from, unsigned count, const char *name)
 	dev_t n, next;
 
 	for (n = from; n < to; n = next) {
-		next = MKDEV(MAJOR(n)+1, 0); // 增大一个主设备号对应的从设备号数量最大值
+		next = MKDEV(MAJOR(n)+1, 0); // 获取下一个主设备号对应的最小设备号
 		if (next > to)
 			next = to;
 		cd = __register_chrdev_region(MAJOR(n), MINOR(n),

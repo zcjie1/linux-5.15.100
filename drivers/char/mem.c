@@ -749,18 +749,23 @@ static char *mem_devnode(struct device *dev, umode_t *mode)
 
 static struct class *mem_class;
 
+// mem类字符类设备初始化(如null, random)
 static int __init chr_dev_init(void)
 {
 	int minor;
 
+	// 申请主设备号为1的所有设备号
 	if (register_chrdev(MEM_MAJOR, "mem", &memory_fops))
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
 
+	// 注册mem_class
 	mem_class = class_create(THIS_MODULE, "mem");
 	if (IS_ERR(mem_class))
 		return PTR_ERR(mem_class);
 
 	mem_class->devnode = mem_devnode;
+
+	// 针对每类mem设备，注册目录/dev下的设备文件
 	for (minor = 1; minor < ARRAY_SIZE(devlist); minor++) {
 		if (!devlist[minor].name)
 			continue;

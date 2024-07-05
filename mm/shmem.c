@@ -2309,6 +2309,7 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		simple_xattrs_init(&info->xattrs);
 		cache_no_acl(inode);
 
+		// 根据文件类型初始化inode->op和inode->fop
 		switch (mode & S_IFMT) {
 		default:
 			inode->i_op = &shmem_special_inode_operations;
@@ -2851,6 +2852,7 @@ shmem_mknod(struct user_namespace *mnt_userns, struct inode *dir,
 	struct inode *inode;
 	int error = -ENOSPC;
 
+	// 生成inode
 	inode = shmem_get_inode(dir->i_sb, dir, mode, dev, VM_NORESERVE);
 	if (inode) {
 		error = simple_acl_create(dir, inode);

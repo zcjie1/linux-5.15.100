@@ -29,22 +29,24 @@
 #include <uapi/linux/mount.h>
 #include "base.h"
 
+// devtmpfsd线程
 static struct task_struct *thread;
 
 static int __initdata mount_dev = IS_ENABLED(CONFIG_DEVTMPFS_MOUNT);
 
 static DEFINE_SPINLOCK(req_lock);
 
+// 用于向内核线程devtmpfsd提交请求
 static struct req {
 	struct req *next;
-	struct completion done;
+	struct completion done; // structure used to maintain state for a "completion"
 	int err;
-	const char *name;
-	umode_t mode;	/* 0 => delete */
+	const char *name; // device name
+	umode_t mode;	/* 0 => delete 设备文件权限位+设备类型标志位 */
 	kuid_t uid;
 	kgid_t gid;
-	struct device *dev;
-} *requests;
+	struct device *dev; // 待注册的device
+} *requests; // 指向第一个req请求
 
 static int __init mount_param(char *str)
 {
@@ -53,6 +55,7 @@ static int __init mount_param(char *str)
 }
 __setup("devtmpfs.mount=", mount_param);
 
+// devtmpfs挂载点
 static struct vfsmount *mnt;
 
 static struct dentry *public_dev_mount(struct file_system_type *fs_type, int flags,
@@ -97,16 +100,22 @@ static inline int is_blockdev(struct device *dev)
 static inline int is_blockdev(struct device *dev) { return 0; }
 #endif
 
+// 向内核先devtmpfsd提交req
 static int devtmpfs_submit_req(struct req *req, const char *tmp)
 {
+	// 初始化completion标志位为0
 	init_completion(&req->done);
 
+	// 将req加入请求链表
 	spin_lock(&req_lock);
 	req->next = requests;
 	requests = req;
 	spin_unlock(&req_lock);
 
+	// 唤醒异步devtmpfsd线程
 	wake_up_process(thread);
+
+	// 等待req完成
 	wait_for_completion(&req->done);
 
 	kfree(tmp);
@@ -114,13 +123,17 @@ static int devtmpfs_submit_req(struct req *req, const char *tmp)
 	return req->err;
 }
 
+// 创建 "/dev" 下的设备文件
 int devtmpfs_create_node(struct device *dev)
 {
+	// 用于暂存device name
 	const char *tmp = NULL;
 	struct req req;
 
 	if (!thread)
 		return 0;
+
+	/* 构建req，用于向内核线程devtmpfsd提交 */
 
 	req.mode = 0;
 	req.uid = GLOBAL_ROOT_UID;
@@ -138,6 +151,7 @@ int devtmpfs_create_node(struct device *dev)
 
 	req.dev = dev;
 
+	// 向内核先devtmpfsd提交req
 	return devtmpfs_submit_req(&req, tmp);
 }
 
@@ -211,14 +225,17 @@ static int handle_create(const char *nodename, umode_t mode, kuid_t uid,
 	struct path path;
 	int err;
 
+	// 生成path结构体，并返回相应dentry
 	dentry = kern_path_create(AT_FDCWD, nodename, &path, 0);
 	if (dentry == ERR_PTR(-ENOENT)) {
+		// nodename的父目录不存在
 		create_path(nodename);
 		dentry = kern_path_create(AT_FDCWD, nodename, &path, 0);
 	}
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
 
+	// 生成dentry->inode
 	err = vfs_mknod(&init_user_ns, d_inode(path.dentry), dentry, mode,
 			dev->devt);
 	if (!err) {
@@ -416,6 +433,7 @@ static noinline int __init devtmpfs_setup(void *p)
 {
 	int err;
 
+	// 改变进程mount命名空间
 	err = ksys_unshare(CLONE_NEWNS);
 	if (err)
 		goto out;

@@ -2955,6 +2955,7 @@ class_dir_create_and_add(struct class *class, struct kobject *parent_kobj)
 
 static DEFINE_MUTEX(gdp_mutex);
 
+// 获取device的父kobj
 static struct kobject *get_device_parent(struct device *dev,
 					 struct device *parent)
 {
@@ -3280,10 +3281,12 @@ int device_add(struct device *dev)
 	int error = -EINVAL;
 	struct kobject *glue_dir = NULL;
 
+	// 增加device引用计数
 	dev = get_device(dev);
 	if (!dev)
 		goto done;
 
+	// 初始化device各类链表节点
 	if (!dev->p) {
 		error = device_private_init(dev);
 		if (error)
@@ -3294,16 +3297,22 @@ int device_add(struct device *dev)
 	 * for statically allocated devices, which should all be converted
 	 * some day, we need to initialize the name. We prevent reading back
 	 * the name, and force the use of dev_name()
+	 * 
+	 * 设置dev->kobj的name
 	 */
 	if (dev->init_name) {
 		dev_set_name(dev, "%s", dev->init_name);
 		dev->init_name = NULL;
 	}
 
-	/* subsystems can specify simple device enumeration */
+	/**
+	 * subsystems can specify simple device enumeration
+	 * 使用 device前缀+device_id 构建device name
+	*/
 	if (!dev_name(dev) && dev->bus && dev->bus->dev_name)
 		dev_set_name(dev, "%s%u", dev->bus->dev_name, dev->id);
 
+	// 若name设置失败，返回错误
 	if (!dev_name(dev)) {
 		error = -EINVAL;
 		goto name_error;
@@ -3311,8 +3320,8 @@ int device_add(struct device *dev)
 
 	pr_debug("device: '%s': %s\n", dev_name(dev), __func__);
 
-	parent = get_device(dev->parent);
-	kobj = get_device_parent(dev, parent);
+	parent = get_device(dev->parent); // 获取device的父device
+	kobj = get_device_parent(dev, parent); // 获取device的父kobj
 	if (IS_ERR(kobj)) {
 		error = PTR_ERR(kobj);
 		goto parent_error;
@@ -3335,6 +3344,8 @@ int device_add(struct device *dev)
 	/* notify platform of device entry */
 	device_platform_notify(dev);
 
+	/* 创建各类属性文件，软链接 */
+
 	error = device_create_file(dev, &dev_attr_uevent);
 	if (error)
 		goto attrError;
@@ -3353,15 +3364,19 @@ int device_add(struct device *dev)
 		goto DPMError;
 	device_pm_add(dev);
 
+	// 若device被分配了设备号(真实设备)
 	if (MAJOR(dev->devt)) {
+		// 创建dev attribute文件
 		error = device_create_file(dev, &dev_attr_dev);
 		if (error)
 			goto DevAttrError;
-
+		
+		// 在 "/sys/dev" 目录下创建软链接
 		error = device_create_sys_dev_entry(dev);
 		if (error)
 			goto SysEntryError;
 
+		// 创建 "/dev" 下的设备文件
 		devtmpfs_create_node(dev);
 	}
 
@@ -3372,6 +3387,7 @@ int device_add(struct device *dev)
 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
 					     BUS_NOTIFY_ADD_DEVICE, dev);
 
+	// 发送KOBJ_ADD uevent事件
 	kobject_uevent(&dev->kobj, KOBJ_ADD);
 
 	/*
@@ -3401,6 +3417,7 @@ int device_add(struct device *dev)
 	if (dev->fwnode && fw_devlink_drv_reg_done && !dev->can_match)
 		fw_devlink_unblock_consumers(dev);
 
+	// 将device接入parent链表中
 	if (parent)
 		klist_add_tail(&dev->p->knode_parent,
 			       &parent->p->klist_children);
@@ -4032,12 +4049,14 @@ device_create_groups_vargs(struct class *class, struct device *parent,
 	if (class == NULL || IS_ERR(class))
 		goto error;
 
+	// 分配device内存
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev) {
 		retval = -ENOMEM;
 		goto error;
 	}
 
+	// device初始化
 	device_initialize(dev);
 	dev->devt = devt;
 	dev->class = class;
@@ -4045,11 +4064,13 @@ device_create_groups_vargs(struct class *class, struct device *parent,
 	dev->groups = groups;
 	dev->release = device_create_release;
 	dev_set_drvdata(dev, drvdata);
-
+	
+	// 设置kobject->name
 	retval = kobject_set_name_vargs(&dev->kobj, fmt, args);
 	if (retval)
 		goto error;
 
+	// 将device加入管理链表和目录中
 	retval = device_add(dev);
 	if (retval)
 		goto error;
@@ -4091,7 +4112,9 @@ struct device *device_create(struct class *class, struct device *parent,
 	va_list vargs;
 	struct device *dev;
 
+	// 获取可变参数
 	va_start(vargs, fmt);
+
 	dev = device_create_groups_vargs(class, parent, devt, drvdata, NULL,
 					  fmt, vargs);
 	va_end(vargs);
