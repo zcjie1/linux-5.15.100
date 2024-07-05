@@ -36,12 +36,13 @@
  * and size information.  That keeps the table sizes small.
  */
 
+#ifdef CONFIG_SMP
+
 /** .long 671f  生成一个整数
  * 值为下面的 671 标号的实际地址，f 表示向前引用，如果 671 标号出现在前面，要写 671b
  * 在 .smp_locks 段生成四个字节的 lock 前缀的地址 
  * 链接时，所有的 .smp_locks 段合并起来，形成一个包含所有 lock 指令地址的数组
  */
-#ifdef CONFIG_SMP
 #define LOCK_PREFIX_HERE \
 		".pushsection .smp_locks,\"a\"\n" /* a = allocatable */	\
 		".balign 4\n"				\
