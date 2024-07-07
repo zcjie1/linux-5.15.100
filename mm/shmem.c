@@ -2312,6 +2312,7 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		// 根据文件类型初始化inode->op和inode->fop
 		switch (mode & S_IFMT) {
 		default:
+			// 字符设备文件、管道文件等特殊文件
 			inode->i_op = &shmem_special_inode_operations;
 			init_special_inode(inode, mode, dev);
 			break;
