@@ -959,6 +959,8 @@ void wake_up_q(struct wake_q_head *head)
  * On UP this means the setting of the need_resched flag, on SMP it
  * might also involve a cross-CPU call to trigger the scheduler on
  * the target CPU.
+ * 
+ * 设置调度标志位
  */
 // 参考https://zhuanlan.zhihu.com/p/353517059
 void resched_curr(struct rq *rq)
