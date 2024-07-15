@@ -7541,6 +7541,9 @@ int ftrace_is_dead(void)
 
 /**
  * register_ftrace_function - register a function for profiling
+ * 
+ * 注册ftrace回调函数
+ * 
  * @ops - ops structure that holds the function for profiling.
  *
  * Register a function to be called by all functions in the

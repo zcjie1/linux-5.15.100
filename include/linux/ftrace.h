@@ -114,6 +114,19 @@ static __always_inline struct pt_regs *ftrace_get_regs(struct ftrace_regs *fregs
 	return arch_ftrace_get_regs(fregs);
 }
 
+/**
+@ip
+This is the instruction pointer of the function that is being traced. (where the fentry or mcount is within the function)
+
+@parent_ip
+This is the instruction pointer of the function that called the the function being traced (where the call of the function occurred).
+
+@op
+This is a pointer to ftrace_ops that was used to register the callback. This can be used to pass data to the callback via the private pointer.
+
+@regs
+If the FTRACE_OPS_FL_SAVE_REGS or FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED flags are set in the ftrace_ops structure, then this will be pointing to the pt_regs structure like it would be if an breakpoint was placed at the start of the function where ftrace was tracing. Otherwise it either contains garbage, or NULL.
+*/
 typedef void (*ftrace_func_t)(unsigned long ip, unsigned long parent_ip,
 			      struct ftrace_ops *op, struct ftrace_regs *fregs);
 
@@ -223,10 +236,10 @@ static inline void ftrace_free_mem(struct module *mod, void *start, void *end) {
  * ftrace_ops must perform a schedule_on_each_cpu() before freeing it.
  */
 struct ftrace_ops {
-	ftrace_func_t			func;
+	ftrace_func_t			func; // Ftrace callback
 	struct ftrace_ops __rcu		*next;
 	unsigned long			flags;
-	void				*private;
+	void				*private; // 私有数据
 	ftrace_func_t			saved_func;
 #ifdef CONFIG_DYNAMIC_FTRACE
 	struct ftrace_ops_hash		local_hash;
