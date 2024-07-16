@@ -272,7 +272,7 @@ static int mounts_open_common(struct inode *inode, struct file *file,
 	task_unlock(task);
 	put_task_struct(task);
 
-	ret = seq_open_private(file, &mounts_op, sizeof(struct proc_mounts));
+	ret = seq_open_private(file, &mounts_op, sizeof(struct proc_mounts)); // 分配seq_file和seq_file->private
 	if (ret)
 		goto err_put_path;
 

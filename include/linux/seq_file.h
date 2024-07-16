@@ -14,7 +14,7 @@
 struct seq_operations;
 
 struct seq_file {
-	char *buf;
+	char *buf; // 数据写入区域
 	size_t size;
 	size_t from;
 	size_t count;

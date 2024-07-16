@@ -62,6 +62,8 @@ sh_initramfs:
 	@cp ./prog/sh_init ./initramfs/init
 	@chmod 777 ./initramfs/init
 
+	@ cp ./prog/test ./initramfs/test
+
 # copy busybox
 	@cp $(shell which busybox) ./initramfs/bin
 	@./prog/busybox_generate.sh
