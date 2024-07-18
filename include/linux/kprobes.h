@@ -145,11 +145,11 @@ struct kretprobe_holder {
 
 struct kretprobe {
 	struct kprobe kp;
-	kretprobe_handler_t handler;
-	kretprobe_handler_t entry_handler;
-	int maxactive;
-	int nmissed;
-	size_t data_size;
+	kretprobe_handler_t handler; // ret处理函数
+	kretprobe_handler_t entry_handler; // entry处理函数
+	int maxactive; // 最大同时处理的探测数量
+	int nmissed; // 错过的探测点(触发了探测点，但没有多余的instance)
+	size_t data_size; // 私有数据size，数据指针在kretprobe_instance中
 	struct freelist_head freelist;
 	struct kretprobe_holder *rph;
 };
