@@ -2398,6 +2398,7 @@ static int ____sys_sendmsg(struct socket *sock, struct msghdr *msg_sys,
 		ctl_buf = msg_sys->msg_control;
 		ctl_len = msg_sys->msg_controllen;
 	} else if (ctl_len) {
+		// 携带辅助信息结构
 		BUILD_BUG_ON(sizeof(struct cmsghdr) !=
 			     CMSG_ALIGN(sizeof(struct cmsghdr)));
 		if (ctl_len > sizeof(ctl)) {

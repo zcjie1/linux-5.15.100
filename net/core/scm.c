@@ -155,7 +155,7 @@ int __scm_send(struct socket *sock, struct msghdr *msg, struct scm_cookie *p)
 		case SCM_RIGHTS:
 			if (!sock->ops || sock->ops->family != PF_UNIX)
 				goto error;
-			err=scm_fp_copy(cmsg, &p->fp);
+			err=scm_fp_copy(cmsg, &p->fp); // 复制所有打开的struct file结构体指针
 			if (err<0)
 				goto error;
 			break;
